@@ -1,0 +1,15 @@
+langgraph
+langchain
+langsmith
+python-dotenv
+langchain-groq
+youtube-transcript-api
+uvicorn
+fastapi
+pydantic
+python-multipart
+langgraph-cli[inmem]
+tavily-python
+langchain-core
+uvicorn[standard]
+openai

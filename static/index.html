@@ -1,0 +1,1626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Modern Recipe Book</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'primary': '#FF7D55', // Warm orange-coral
+            'primary-light': '#FFE8E0',
+            'primary-dark': '#E05A30',
+            'secondary': '#2D3748', // Dark slate for text
+            'tertiary': '#4A5568', // Medium slate for subheadings
+            'accent': '#38B2AC', // Teal accent color
+            'accent-light': '#E6FFFA',
+            'background': '#FFFAF5', // Warm white
+            'surface': '#FFFFFF', // Pure white
+            'surface-light': '#F9FAFB', // Light gray background
+            'border': '#E2E8F0', // Light border color
+          },
+          fontFamily: {
+            'display': ['Playfair Display', 'serif'],
+            'body': ['Poppins', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom animations */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .animate-fade-in {
+      animation: fadeIn 0.6s ease-out forwards;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    
+    .animate-pulse-slow {
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .animate-slide-up {
+      animation: slideUp 0.3s ease-out forwards;
+    }
+    
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 10px;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+      background: #FF7D55;
+      border-radius: 10px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+      background: #E05A30;
+    }
+    
+    /* Collapsible section styling */
+    .recipe-section {
+      max-height: 1000px;
+      overflow: hidden;
+      transition: max-height 0.5s ease-in-out, opacity 0.5s ease-in-out, margin 0.5s ease-in-out;
+      opacity: 1;
+      margin-top: 8px;
+    }
+    
+    .recipe-section.collapsed {
+      max-height: 0;
+      opacity: 0;
+      margin-top: 0;
+      margin-bottom: 0;
+      padding: 0;
+    }
+    
+    /* Smart scrollable instructions for long recipes */
+    .instructions-content {
+      max-height: 500px;
+      overflow-y: auto;
+      padding-right: 8px;
+    }
+    
+    .instructions-content::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    .instructions-content::-webkit-scrollbar-track {
+      background: #f8f9fa;
+      border-radius: 3px;
+    }
+    
+    .instructions-content::-webkit-scrollbar-thumb {
+      background: #FF7D55;
+      border-radius: 3px;
+    }
+    
+    .instructions-content::-webkit-scrollbar-thumb:hover {
+      background: #E05A30;
+    }
+    
+    /* Category tag styling */
+    .category-tag {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 32px;
+      padding-left: 16px;
+      padding-right: 16px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    
+    /* Notes section transitions */
+    .notes-transition {
+      transition: opacity 0.3s ease;
+    }
+    
+    /* Focus styles for accessibility */
+    .focus-ring:focus-visible {
+      outline: 2px solid #FF7D55;
+      outline-offset: 2px;
+    }
+    
+    /* Skip to content for accessibility */
+    .skip-to-content {
+      position: absolute;
+      left: -9999px;
+      z-index: 999;
+      padding: 1em;
+      background-color: #FFFFFF;
+      color: #FF7D55;
+      font-weight: 700;
+      text-decoration: none;
+    }
+    
+    .skip-to-content:focus {
+      left: 50%;
+      transform: translateX(-50%);
+      top: 0;
+    }
+    
+    /* Modal backdrop */
+    .modal-backdrop {
+      background-color: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(4px);
+    }
+    
+    /* Horizontal scroll for filters */
+    .filter-scroll {
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    
+    .filter-scroll::-webkit-scrollbar {
+      display: none;
+    }
+  </style>
+</head>
+<body class="font-body text-secondary bg-gradient-to-br from-background to-surface-light min-h-screen">
+  <!-- Accessibility skip link -->
+  <a href="#main-content" class="skip-to-content focus-ring">Skip to main content</a>
+
+  <!-- Fixed Professional Header -->
+  <header class="sticky top-0 z-50 bg-surface shadow-sm border-b border-border" role="banner">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <!-- Logo -->
+        <div class="flex items-center space-x-3">
+          <span class="text-primary text-2xl" aria-hidden="true">
+            <i class="fas fa-utensils"></i>
+          </span>
+          <h1 class="font-display text-2xl sm:text-3xl font-bold bg-gradient-to-r from-primary to-primary-dark bg-clip-text text-transparent">
+            Recipe Book
+          </h1>
+        </div>
+
+        <!-- Right side actions -->
+        <div class="flex items-center space-x-3">
+          <!-- Search Bar (Desktop) -->
+          <div class="hidden md:block relative">
+            <label for="search" class="sr-only">Search recipes</label>
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <i class="fas fa-search text-gray-400 text-sm" aria-hidden="true"></i>
+            </div>
+            <input 
+              type="search" 
+              id="search" 
+              placeholder="Search recipes..." 
+              class="w-64 py-2 pl-9 pr-4 text-sm rounded-full border border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none bg-white transition-all duration-200 focus-ring"
+              aria-label="Search recipes"
+            >
+            <button id="clear-search" class="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 text-gray-400 hover:text-primary transition-opacity duration-200" aria-label="Clear search">
+              <i class="fas fa-times text-xs"></i>
+            </button>
+          </div>
+
+          <!-- YouTube Add Recipe Button -->
+          <button 
+            id="add-recipe-btn"
+            class="flex items-center space-x-2 bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-full text-sm font-medium transition-all duration-200 transform hover:scale-105 focus-ring"
+            aria-label="Add recipe from YouTube"
+          >
+            <i class="fab fa-youtube text-base" aria-hidden="true"></i>
+            <span class="hidden sm:inline">Add Recipe</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Mobile Search Bar -->
+      <div class="md:hidden pb-4">
+        <div class="relative">
+          <label for="mobile-search" class="sr-only">Search recipes</label>
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <i class="fas fa-search text-gray-400 text-sm" aria-hidden="true"></i>
+          </div>
+          <input 
+            type="search" 
+            id="mobile-search" 
+            placeholder="Search recipes..." 
+            class="w-full py-2.5 pl-9 pr-4 text-sm rounded-full border border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none bg-white transition-all duration-200 focus-ring"
+            aria-label="Search recipes"
+          >
+          <button id="clear-mobile-search" class="absolute right-3 top-1/2 transform -translate-y-1/2 opacity-0 text-gray-400 hover:text-primary transition-opacity duration-200" aria-label="Clear search">
+            <i class="fas fa-times text-xs"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Category Filters Section -->
+  <section class="bg-gradient-to-br from-background to-surface-light py-6">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <!-- Desktop Filters -->
+      <div class="hidden lg:flex justify-center">
+        <nav class="flex items-center space-x-2" id="desktop-filters" role="tablist" aria-label="Recipe categories">
+          <!-- Filters will be added dynamically -->
+        </nav>
+      </div>
+
+      <!-- Mobile Filters -->
+      <div class="lg:hidden">
+        <div class="filter-scroll flex space-x-2 overflow-x-auto px-4" id="mobile-filters" role="tablist" aria-label="Recipe categories" style="scroll-padding-left: 1rem; scroll-padding-right: 1rem;">
+          <!-- Filters will be added dynamically -->
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- YouTube Recipe Modal -->
+  <div id="youtube-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 modal-backdrop">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 transform transition-all duration-300 animate-slide-up">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between p-6 border-b border-gray-200">
+        <h3 class="text-xl font-display font-bold text-secondary flex items-center">
+          <i class="fab fa-youtube text-red-500 mr-3" aria-hidden="true"></i>
+          Add Recipe from YouTube
+        </h3>
+        <button 
+          id="close-modal" 
+          class="text-gray-400 hover:text-gray-600 transition-colors duration-200 focus-ring rounded-full p-1"
+          aria-label="Close modal"
+        >
+          <i class="fas fa-times text-lg" aria-hidden="true"></i>
+        </button>
+      </div>
+
+      <!-- Modal Content -->
+      <div class="p-6">
+        <div class="mb-4">
+          <label for="youtube-url-input" class="block text-sm font-medium text-gray-700 mb-2">
+            YouTube Video URL
+          </label>
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <i class="fab fa-youtube text-red-500" aria-hidden="true"></i>
+            </div>
+            <input 
+              type="url" 
+              id="youtube-url-input" 
+              placeholder="https://www.youtube.com/watch?v=..." 
+              class="w-full py-3 pl-10 pr-4 text-sm rounded-full border-2 border-gray-200 focus:border-red-500 focus:ring-2 focus:ring-red-200 focus:outline-none bg-white transition-all duration-200 focus-ring"
+              aria-label="YouTube video URL"
+            >
+          </div>
+          <p class="mt-2 text-xs text-gray-500">
+            Paste a YouTube cooking video URL to automatically extract the recipe
+          </p>
+        </div>
+
+        <!-- Modal Actions -->
+        <div class="flex space-x-3">
+          <button 
+            id="extract-recipe-btn" 
+            class="flex-1 bg-gradient-to-r from-red-500 to-red-600 text-white py-3 px-4 rounded-full text-sm font-medium transition-all duration-200 hover:from-red-600 hover:to-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center focus-ring"
+            aria-label="Extract recipe from YouTube video"
+          >
+            <i class="fas fa-magic mr-2" aria-hidden="true"></i>
+            Extract Recipe
+          </button>
+          <button 
+            id="cancel-modal" 
+            class="px-4 py-3 border border-gray-300 text-gray-700 rounded-full text-sm font-medium hover:bg-gray-50 transition-colors duration-200 focus-ring"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <main id="main-content" class="max-w-7xl mx-auto px-4 md:px-6 py-8" role="main">
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-8">
+      <!-- Recipe Cards Column -->
+      <div class="lg:col-span-2">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-6 md:gap-8" id="recipe-grid" role="list" aria-label="Recipe list">
+          <!-- Recipe cards will be added dynamically -->
+        </div>
+      </div>
+
+      <!-- Recipe Details Column -->
+      <div class="lg:col-span-3">
+        <div class="bg-surface rounded-2xl shadow-xl border border-primary-light overflow-hidden transition-all duration-300 hover:shadow-2xl" id="recipe-details">
+          <!-- Empty State -->
+          <div class="flex flex-col items-center justify-center p-16 text-center" id="no-selection" role="status" aria-live="polite">
+            <div class="w-24 h-24 flex items-center justify-center rounded-full bg-primary-light text-primary mb-6 animate-pulse-slow">
+              <i class="fas fa-book-open text-4xl" aria-hidden="true"></i>
+            </div>
+            <h3 class="text-2xl font-display font-bold mb-3">Select a Recipe</h3>
+            <p class="text-tertiary max-w-md">Choose a delicious recipe from our collection to view ingredients, instructions, and start cooking!</p>
+          </div>
+          
+          <!-- Recipe Content -->
+          <div class="hidden" id="details-content" role="region" aria-live="polite">
+            <!-- Recipe details will be loaded here -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-gradient-to-r from-secondary to-tertiary text-white mt-16" role="contentinfo">
+    <div class="max-w-7xl mx-auto px-6 py-12">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <!-- About Section -->
+        <div class="animate-fade-in" style="animation-delay: 0.4s;">
+          <h3 class="font-display text-lg uppercase tracking-wider mb-5 text-primary-light">About</h3>
+          <p class="text-gray-300 mb-5">A modern collection of curated recipes for home cooks looking for inspiration and tried-and-tested dishes.</p>
+          <div class="flex gap-4">
+            <a href="#" class="text-gray-300 hover:text-primary-light transition-colors duration-300 focus-ring" aria-label="Instagram">
+              <i class="fab fa-instagram text-xl" aria-hidden="true"></i>
+            </a>
+            <a href="#" class="text-gray-300 hover:text-primary-light transition-colors duration-300 focus-ring" aria-label="Pinterest">
+              <i class="fab fa-pinterest text-xl" aria-hidden="true"></i>
+            </a>
+            <a href="#" class="text-gray-300 hover:text-primary-light transition-colors duration-300 focus-ring" aria-label="Facebook">
+              <i class="fab fa-facebook-f text-xl" aria-hidden="true"></i>
+            </a>
+            <a href="#" class="text-gray-300 hover:text-primary-light transition-colors duration-300 focus-ring" aria-label="Twitter">
+              <i class="fab fa-twitter text-xl" aria-hidden="true"></i>
+            </a>
+          </div>
+        </div>
+        
+        <!-- Browse Links -->
+        <div class="animate-fade-in" style="animation-delay: 0.5s;">
+          <h3 class="font-display text-lg uppercase tracking-wider mb-5 text-primary-light">Browse</h3>
+          <ul>
+            <li class="mb-3"><a href="#" class="text-gray-300 hover:text-primary-light transition-colors duration-300 flex items-center focus-ring"><i class="fas fa-chevron-right text-xs mr-2 text-primary-light" aria-hidden="true"></i>Popular Recipes</a></li>
+            <li class="mb-3"><a href="#" class="text-gray-300 hover:text-primary-light transition-colors duration-300 flex items-center focus-ring"><i class="fas fa-chevron-right text-xs mr-2 text-primary-light" aria-hidden="true"></i>Quick & Easy</a></li>
+            <li class="mb-3"><a href="#" class="text-gray-300 hover:text-primary-light transition-colors duration-300 flex items-center focus-ring"><i class="fas fa-chevron-right text-xs mr-2 text-primary-light" aria-hidden="true"></i>Seasonal</a></li>
+            <li class="mb-3"><a href="#" class="text-gray-300 hover:text-primary-light transition-colors duration-300 flex items-center focus-ring"><i class="fas fa-chevron-right text-xs mr-2 text-primary-light" aria-hidden="true"></i>Occasion</a></li>
+          </ul>
+        </div>
+        
+        <!-- Information Links -->
+        <div class="animate-fade-in" style="animation-delay: 0.6s;">
+          <h3 class="font-display text-lg uppercase tracking-wider mb-5 text-primary-light">Information</h3>
+          <ul>
+            <li class="mb-3"><a href="#" class="text-gray-300 hover:text-primary-light transition-colors duration-300 flex items-center focus-ring"><i class="fas fa-chevron-right text-xs mr-2 text-primary-light" aria-hidden="true"></i>About Us</a></li>
+            <li class="mb-3"><a href="#" class="text-gray-300 hover:text-primary-light transition-colors duration-300 flex items-center focus-ring"><i class="fas fa-chevron-right text-xs mr-2 text-primary-light" aria-hidden="true"></i>Contact</a></li>
+            <li class="mb-3"><a href="#" class="text-gray-300 hover:text-primary-light transition-colors duration-300 flex items-center focus-ring"><i class="fas fa-chevron-right text-xs mr-2 text-primary-light" aria-hidden="true"></i>Privacy Policy</a></li>
+            <li class="mb-3"><a href="#" class="text-gray-300 hover:text-primary-light transition-colors duration-300 flex items-center focus-ring"><i class="fas fa-chevron-right text-xs mr-2 text-primary-light" aria-hidden="true"></i>Terms</a></li>
+          </ul>
+        </div>
+        
+        <!-- Subscribe -->
+        <div class="animate-fade-in" style="animation-delay: 0.7s;">
+          <h3 class="font-display text-lg uppercase tracking-wider mb-5 text-primary-light">Subscribe</h3>
+          <p class="text-gray-300 mb-4">Get fresh recipes and cooking tips delivered straight to your inbox.</p>
+          <form aria-label="Newsletter subscription">
+            <div class="relative mb-3">
+              <label for="email-input" class="sr-only">Your email</label>
+              <input 
+                id="email-input"
+                type="email" 
+                placeholder="Your email" 
+                class="w-full bg-tertiary/50 border border-tertiary rounded-lg py-3 px-4 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-light focus-ring"
+                aria-label="Email address for newsletter"
+              >
+              <div class="absolute inset-y-0 right-0 flex items-center pr-3">
+                <i class="fas fa-envelope text-gray-400" aria-hidden="true"></i>
+              </div>
+            </div>
+            <button 
+              type="submit" 
+              class="w-full bg-gradient-to-r from-primary to-primary-dark text-white font-medium py-3 px-4 rounded-lg transition-all duration-300 hover:from-primary-dark hover:to-primary transform hover:-translate-y-1 hover:shadow-lg focus-ring"
+            >
+              Subscribe
+            </button>
+          </form>
+        </div>
+      </div>
+      
+      <!-- Bottom Footer -->
+      <div class="text-center text-gray-400 text-sm mt-12 pt-8 border-t border-gray-700">
+        <p class="mb-4">© 2023 Recipe Book. All rights reserved.</p>
+        <div class="flex justify-center gap-4 text-xs">
+          <span>Recipes</span>
+          <span>|</span>
+          <span>Photography</span>
+          <span>|</span>
+          <span>Food Styling</span>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+
+    // ====== Application State ======
+    const RecipeBookApp = {
+      // App state
+      state: {
+        recipes: [
+          {
+            id: 1,
+            name: 'Vegetarian Black Bean Chili',
+            description: 'Consider this vegetarian chili a basic formula, ripe for riffing: Toss in a few different types of beans, bell peppers, or spices to make the recipe your own.',
+            category: 'Main Course',
+            image: 'https://images.unsplash.com/photo-1627906327792-4ede6149189f?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8YmxhY2slMjBiZWFuJTIwY2hpbGxpfGVufDB8fDB8fHww',
+            prep_time: '10 min',
+            cook_time: '40 min',
+            servings: 6,
+            difficulty: 'Easy',
+            ingredients: [
+              '2 tbsp olive oil',
+              '1 medium onion, diced',
+              '1 red bell pepper, diced',
+              '4 cloves garlic, minced',
+              '2 tbsp chili powder',
+              '1 tbsp ground cumin',
+              '1 tsp dried oregano',
+              '2 (15 oz) cans black beans, drained and rinsed',
+              '1 (15 oz) can diced tomatoes',
+              '1 cup vegetable broth',
+              'Salt and pepper to taste',
+              'Optional toppings: sour cream, shredded cheese, cilantro, lime wedges'
+            ],
+            instructions: [
+              'Heat olive oil in a large pot over medium heat. Add onion and bell pepper and cook until softened, about 5 minutes.',
+              'Add garlic, chili powder, cumin, and oregano. Cook until fragrant, about 1 minute.',
+              'Stir in black beans, diced tomatoes, and vegetable broth. Bring to a simmer.',
+              'Reduce heat to low and simmer, partially covered, stirring occasionally, for about 30 minutes until thickened.',
+              'Season with salt and pepper to taste.',
+              'Serve with your choice of toppings like sour cream, shredded cheese, chopped cilantro, and lime wedges.'
+            ]
+          },
+          {
+            id: 2,
+            name: 'Classic Caesar Salad',
+            description: 'A restaurant-worthy Caesar salad with a rich and creamy dressing, crisp romaine lettuce, and homemade croutons. The perfect side dish or light meal.',
+            category: 'Appetizer',
+            image: 'https://images.unsplash.com/photo-1551892374-ecf8754cf8b0?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.0.3',
+            prep_time: '15 min',
+            cook_time: '10 min',
+            servings: 4,
+            difficulty: 'Medium',
+            ingredients: [
+              '1 large head romaine lettuce, washed and chopped',
+              '2 slices day-old bread, cubed',
+              '2 tbsp olive oil',
+              '2 cloves garlic, minced',
+              '1/4 cup mayonnaise',
+              '1 tbsp dijon mustard',
+              '1 tbsp lemon juice',
+              '1 tsp Worcestershire sauce',
+              '2 anchovy fillets, minced (optional)',
+              '1/3 cup grated Parmesan cheese, plus more for garnish',
+              'Salt and freshly ground black pepper',
+              '1 tbsp olive oil for dressing'
+            ],
+            instructions: [
+              'Preheat oven to 375°F (190°C). Toss bread cubes with olive oil and garlic. Spread on a baking sheet and bake until golden and crisp, about 10 minutes, tossing halfway through.',
+              'In a small bowl, whisk together mayonnaise, mustard, lemon juice, Worcestershire sauce, anchovies (if using), and olive oil until smooth.',
+              'Stir in grated Parmesan cheese and season with salt and pepper to taste.',
+              'In a large bowl, toss romaine lettuce with the dressing until evenly coated.',
+              'Add croutons and toss gently.',
+              'Serve immediately, garnished with additional Parmesan cheese and freshly ground black pepper.'
+            ]
+          },
+          {
+            id: 3,
+            name: 'Berry Banana Smoothie',
+            description: 'A refreshing, nutrient-packed smoothie that makes for a perfect breakfast or post-workout refuel. Customize with your favorite milk and berries.',
+            category: 'Drink',
+            image: 'https://plus.unsplash.com/premium_photo-1668615553280-5f814bb9b725?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTN8fGJhbmFuYSUyMHNtb290aGllfGVufDB8fDB8fHww',
+            prep_time: '5 min',
+            cook_time: '0 min',
+            servings: 2,
+            difficulty: 'Easy',
+            ingredients: [
+              '1 ripe banana, frozen and sliced',
+              '1 cup mixed berries (strawberries, blueberries, raspberries)',
+              '1 cup milk of choice (dairy, almond, oat, etc.)',
+              '1/2 cup Greek yogurt',
+              '1 tbsp honey or maple syrup (optional)',
+              '1/2 tsp vanilla extract',
+              'Ice cubes (optional)'
+            ],
+            instructions: [
+              'Add banana, berries, milk, yogurt, sweetener (if using), and vanilla extract to a blender.',
+              'Blend on high speed until smooth and creamy, about 30-60 seconds.',
+              'If a thicker consistency is desired, add a few ice cubes and blend again.',
+              'Taste and adjust sweetness if necessary.',
+              'Pour into glasses and serve immediately.'
+            ]
+          }
+        ],
+        notes: {},
+        savedRecipes: [],
+        currentRecipe: null,
+        activeFilter: 'all',
+        searchTerm: '',
+        isLoading: false
+      },
+      
+      // DOM Elements cache
+      elements: {
+        recipeGrid: document.getElementById('recipe-grid'),
+        recipeDetails: document.getElementById('recipe-details'),
+        noSelection: document.getElementById('no-selection'),
+        detailsContent: document.getElementById('details-content'),
+        searchInput: document.getElementById('search'),
+        mobileSearchInput: document.getElementById('mobile-search'),
+        clearSearchBtn: document.getElementById('clear-search'),
+        clearMobileSearchBtn: document.getElementById('clear-mobile-search'),
+        desktopFilters: document.getElementById('desktop-filters'),
+        mobileFilters: document.getElementById('mobile-filters'),
+        // Modal elements
+        youtubeModal: document.getElementById('youtube-modal'),
+        addRecipeBtn: document.getElementById('add-recipe-btn'),
+        closeModalBtn: document.getElementById('close-modal'),
+        cancelModalBtn: document.getElementById('cancel-modal'),
+        youtubeUrlInput: document.getElementById('youtube-url-input'),
+        extractRecipeBtn: document.getElementById('extract-recipe-btn')
+      },
+      
+      // ====== INITIALIZATION ======
+      init() {
+        this.loadStoredData();
+        this.setupEventListeners();
+        this.setupYouTubeModal();
+        this.render();
+        this.animatePageLoad();
+      },
+      
+      loadStoredData() {
+        try {
+          const storedNotes = localStorage.getItem('recipe_notes');
+          const storedSaved = localStorage.getItem('saved_recipes');
+          
+          if (storedNotes) this.state.notes = JSON.parse(storedNotes);
+          if (storedSaved) this.state.savedRecipes = JSON.parse(storedSaved);
+        } catch (e) {
+          console.error('Error loading from localStorage:', e);
+          // Fallback to empty data
+          this.state.notes = {};
+          this.state.savedRecipes = [];
+        }
+      },
+      
+      setupEventListeners() {
+        // Search functionality with debounce for both desktop and mobile
+        this.elements.searchInput.addEventListener('input', this.debounce(() => {
+          this.state.searchTerm = this.elements.searchInput.value.toLowerCase();
+          // Sync mobile search
+          this.elements.mobileSearchInput.value = this.elements.searchInput.value;
+          this.updateClearButtonVisibility();
+          this.applyFilters();
+        }, 300));
+        
+        this.elements.mobileSearchInput.addEventListener('input', this.debounce(() => {
+          this.state.searchTerm = this.elements.mobileSearchInput.value.toLowerCase();
+          // Sync desktop search
+          this.elements.searchInput.value = this.elements.mobileSearchInput.value;
+          this.updateMobileClearButtonVisibility();
+          this.applyFilters();
+        }, 300));
+        
+        // Clear search buttons
+        this.elements.clearSearchBtn.addEventListener('click', () => {
+          this.elements.searchInput.value = '';
+          this.elements.mobileSearchInput.value = '';
+          this.state.searchTerm = '';
+          this.updateClearButtonVisibility();
+          this.updateMobileClearButtonVisibility();
+          this.applyFilters();
+          this.elements.searchInput.focus();
+        });
+        
+        this.elements.clearMobileSearchBtn.addEventListener('click', () => {
+          this.elements.searchInput.value = '';
+          this.elements.mobileSearchInput.value = '';
+          this.state.searchTerm = '';
+          this.updateClearButtonVisibility();
+          this.updateMobileClearButtonVisibility();
+          this.applyFilters();
+          this.elements.mobileSearchInput.focus();
+        });
+        
+        // Update clear button visibility on focus/blur
+        this.elements.searchInput.addEventListener('focus', this.updateClearButtonVisibility.bind(this));
+        this.elements.searchInput.addEventListener('blur', () => {
+          setTimeout(this.updateClearButtonVisibility.bind(this), 100);
+        });
+        
+        this.elements.mobileSearchInput.addEventListener('focus', this.updateMobileClearButtonVisibility.bind(this));
+        this.elements.mobileSearchInput.addEventListener('blur', () => {
+          setTimeout(this.updateMobileClearButtonVisibility.bind(this), 100);
+        });
+        
+        // Keyboard accessibility
+        document.addEventListener('keydown', (e) => {
+          // Escape key handling
+          if (e.key === 'Escape') {
+            if (this.elements.youtubeModal && !this.elements.youtubeModal.classList.contains('hidden')) {
+              this.closeYouTubeModal();
+            } else if ((this.elements.searchInput === document.activeElement || this.elements.mobileSearchInput === document.activeElement) && this.state.searchTerm) {
+              this.elements.searchInput.value = '';
+              this.elements.mobileSearchInput.value = '';
+              this.state.searchTerm = '';
+              this.updateClearButtonVisibility();
+              this.updateMobileClearButtonVisibility();
+              this.applyFilters();
+              e.preventDefault();
+            }
+          }
+        });
+      },
+      
+      updateClearButtonVisibility() {
+        const hasValue = this.elements.searchInput.value.length > 0;
+        if (hasValue) {
+          this.elements.clearSearchBtn.classList.remove('opacity-0');
+          this.elements.clearSearchBtn.classList.add('opacity-100');
+        } else {
+          this.elements.clearSearchBtn.classList.remove('opacity-100');
+          this.elements.clearSearchBtn.classList.add('opacity-0');
+        }
+      },
+      
+      updateMobileClearButtonVisibility() {
+        const hasValue = this.elements.mobileSearchInput.value.length > 0;
+        if (hasValue) {
+          this.elements.clearMobileSearchBtn.classList.remove('opacity-0');
+          this.elements.clearMobileSearchBtn.classList.add('opacity-100');
+        } else {
+          this.elements.clearMobileSearchBtn.classList.remove('opacity-100');
+          this.elements.clearMobileSearchBtn.classList.add('opacity-0');
+        }
+      },
+      
+      render() {
+        this.renderFilters();
+        this.renderRecipes(this.getFilteredRecipes());
+      },
+      
+      setupYouTubeModal() {
+        // Open modal
+        this.elements.addRecipeBtn.addEventListener('click', () => {
+          this.openYouTubeModal();
+        });
+        
+        // Close modal buttons
+        this.elements.closeModalBtn.addEventListener('click', () => {
+          this.closeYouTubeModal();
+        });
+        
+        this.elements.cancelModalBtn.addEventListener('click', () => {
+          this.closeYouTubeModal();
+        });
+        
+        // Close modal on backdrop click
+        this.elements.youtubeModal.addEventListener('click', (e) => {
+          if (e.target === this.elements.youtubeModal) {
+            this.closeYouTubeModal();
+          }
+        });
+        
+        // Extract recipe functionality
+        this.elements.extractRecipeBtn.addEventListener('click', async () => {
+          const url = this.elements.youtubeUrlInput.value.trim();
+          if (!url) {
+            alert('Please enter a YouTube URL');
+            return;
+          }
+          
+          if (!this.isValidYouTubeURL(url)) {
+            alert('Please enter a valid YouTube URL');
+            return;
+          }
+          
+          await this.extractRecipeFromYouTube(url);
+        });
+        
+        // Enter key support in URL input
+        this.elements.youtubeUrlInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            this.elements.extractRecipeBtn.click();
+          }
+        });
+      },
+      
+      openYouTubeModal() {
+        this.elements.youtubeModal.classList.remove('hidden');
+        this.elements.youtubeModal.classList.add('flex');
+        
+        // Focus the input
+        setTimeout(() => {
+          this.elements.youtubeUrlInput.focus();
+        }, 100);
+        
+        // Prevent body scroll
+        document.body.style.overflow = 'hidden';
+      },
+      
+      closeYouTubeModal() {
+        this.elements.youtubeModal.classList.add('hidden');
+        this.elements.youtubeModal.classList.remove('flex');
+        
+        // Clear the input
+        this.elements.youtubeUrlInput.value = '';
+        
+        // Reset extract button
+        this.elements.extractRecipeBtn.disabled = false;
+        this.elements.extractRecipeBtn.innerHTML = '<i class="fas fa-magic mr-2" aria-hidden="true"></i>Extract Recipe';
+        
+        // Restore body scroll
+        document.body.style.overflow = '';
+      },
+
+      isValidYouTubeURL(url) {
+        const patterns = [
+          /^https?:\/\/(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)/,
+          /^https?:\/\/(www\.)?youtube\.com\/embed\//
+        ];
+        return patterns.some(pattern => pattern.test(url));
+      },
+
+      async extractRecipeFromYouTube(url) {
+        const extractBtn = this.elements.extractRecipeBtn;
+        const originalText = extractBtn.innerHTML;
+        
+        // Show loading state
+        extractBtn.disabled = true;
+        extractBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Extracting...';
+        
+        try {
+          const response = await fetch('/api/extract-recipe', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ youtube_url: url })
+          });
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
+          const newRecipe = await response.json();
+          
+          // Add to recipes state
+          this.state.recipes.unshift(newRecipe);
+          
+          // Close modal
+          this.closeYouTubeModal();
+          
+          // Re-render recipes
+          this.render();
+          
+          // Show the new recipe details
+          this.showRecipeDetails(newRecipe);
+          
+          // Show success message
+          this.showNotification('Recipe extracted successfully!', 'success');
+          
+        } catch (error) {
+          console.error('Error extracting recipe:', error);
+          this.showNotification('Failed to extract recipe. Please try again.', 'error');
+        } finally {
+          // Reset button
+          extractBtn.disabled = false;
+          extractBtn.innerHTML = originalText;
+        }
+      },
+
+      showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg transition-all duration-300 transform translate-x-full ${
+          type === 'success' ? 'bg-green-500 text-white' : 
+          type === 'error' ? 'bg-red-500 text-white' : 
+          'bg-blue-500 text-white'
+        }`;
+        notification.textContent = message;
+        
+        document.body.appendChild(notification);
+        
+        // Slide in
+        setTimeout(() => {
+          notification.style.transform = 'translateX(0)';
+        }, 100);
+        
+        // Slide out and remove
+        setTimeout(() => {
+          notification.style.transform = 'translateX(100%)';
+          setTimeout(() => {
+            if (document.body.contains(notification)) {
+              document.body.removeChild(notification);
+            }
+          }, 300);
+        }, 3000);
+      },
+      
+      animatePageLoad() {
+        document.body.classList.add('opacity-0');
+        setTimeout(() => {
+          document.body.classList.remove('opacity-0');
+          document.body.classList.add('transition-opacity', 'duration-500', 'opacity-100');
+        }, 100);
+      },
+
+      // ====== FILTERING & SEARCH ======
+      getFilteredRecipes() {
+        // First apply category filter
+        let filteredRecipes;
+        if (this.state.activeFilter === 'all') {
+          filteredRecipes = this.state.recipes;
+        } else if (this.state.activeFilter === 'favorites') {
+          filteredRecipes = this.state.recipes.filter(r => this.state.savedRecipes.includes(r.id));
+        } else {
+          filteredRecipes = this.state.recipes.filter(r => r.category === this.state.activeFilter);
+        }
+        
+        // Then apply search filter if needed
+        if (this.state.searchTerm) {
+          filteredRecipes = filteredRecipes.filter(recipe => 
+            recipe.name.toLowerCase().includes(this.state.searchTerm) || 
+            recipe.description.toLowerCase().includes(this.state.searchTerm) ||
+            recipe.ingredients.some(i => i.toLowerCase().includes(this.state.searchTerm)) ||
+            recipe.category.toLowerCase().includes(this.state.searchTerm)
+          );
+        }
+        
+        return filteredRecipes;
+      },
+      
+      applyFilters() {
+        const filteredRecipes = this.getFilteredRecipes();
+        
+        // Fade out current recipes
+        const cards = this.elements.recipeGrid.querySelectorAll('div[class*="group"]');
+        if (cards.length > 0) {
+          cards.forEach(card => {
+            card.style.transition = 'opacity 0.3s ease-out, transform 0.3s ease-out';
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(10px)';
+          });
+          
+          // Render new recipes after fade out
+          setTimeout(() => {
+            this.renderRecipes(filteredRecipes);
+          }, 300);
+        } else {
+          this.renderRecipes(filteredRecipes);
+        }
+      },
+      
+      // ====== RENDERING FUNCTIONS ======
+      renderFilters() {
+        const categories = ['all', ...new Set(this.state.recipes.map(r => r.category))];
+        
+        // Clear both filter containers
+        this.elements.desktopFilters.innerHTML = '';
+        this.elements.mobileFilters.innerHTML = '';
+        
+        categories.forEach((category, index) => {
+          this.createFilterButton(category, this.elements.desktopFilters, false);
+          this.createFilterButton(category, this.elements.mobileFilters, true);
+        });
+        
+        // Add Favorites button to both
+        this.createFavoritesButton(this.elements.desktopFilters, false);
+        this.createFavoritesButton(this.elements.mobileFilters, true);
+      },
+      
+      createFilterButton(category, container, isMobile) {
+        const isActive = category === this.state.activeFilter;
+        const btn = document.createElement('button');
+        
+        btn.className = `${isMobile ? 'flex-shrink-0 ' : ''}px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 focus-ring ${
+          isActive 
+            ? 'bg-gradient-to-r from-primary to-primary-dark text-white shadow-md' 
+            : 'bg-white text-tertiary hover:bg-primary-light hover:text-primary border border-gray-200 hover:border-primary-light'
+        }`;
+        
+        btn.textContent = category === 'all' ? 'All Recipes' : category;
+        btn.setAttribute('role', 'tab');
+        btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        btn.setAttribute('aria-controls', 'recipe-grid');
+        btn.setAttribute('id', `${isMobile ? 'mobile-' : 'desktop-'}filter-${category}`);
+        btn.setAttribute('tabindex', isActive ? '0' : '-1');
+        
+        btn.addEventListener('click', () => this.handleFilterClick(category));
+        
+        container.appendChild(btn);
+      },
+      
+      createFavoritesButton(container, isMobile) {
+        const isFavoritesActive = this.state.activeFilter === 'favorites';
+        const favoritesBtn = document.createElement('button');
+        
+        favoritesBtn.className = `${isMobile ? 'flex-shrink-0 ' : ''}px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 focus-ring ${
+          isFavoritesActive 
+            ? 'bg-gradient-to-r from-primary to-primary-dark text-white shadow-md' 
+            : 'bg-white text-tertiary hover:bg-primary-light hover:text-primary border border-gray-200 hover:border-primary-light'
+        } flex items-center space-x-2`;
+        
+        favoritesBtn.innerHTML = `
+          <i class="fas fa-bookmark" aria-hidden="true"></i>
+          <span>Favorites</span>
+        `;
+        
+        favoritesBtn.setAttribute('role', 'tab');
+        favoritesBtn.setAttribute('aria-selected', isFavoritesActive ? 'true' : 'false');
+        favoritesBtn.setAttribute('aria-controls', 'recipe-grid');
+        favoritesBtn.setAttribute('id', `${isMobile ? 'mobile-' : 'desktop-'}filter-favorites`);
+        favoritesBtn.setAttribute('tabindex', isFavoritesActive ? '0' : '-1');
+        
+        favoritesBtn.addEventListener('click', () => this.handleFilterClick('favorites'));
+        container.appendChild(favoritesBtn);
+      },
+  
+      renderRecipes(recipesToRender) {
+        this.elements.recipeGrid.innerHTML = '';
+        
+        if (recipesToRender.length === 0) {
+          this.renderEmptyState();
+          return;
+        }
+        
+        recipesToRender.forEach((recipe, index) => {
+          this.renderRecipeCard(recipe, index, recipesToRender.length);
+        });
+      },
+      
+      renderEmptyState() {
+        const emptyState = document.createElement('div');
+        emptyState.className = 'col-span-full text-center py-10';
+        emptyState.setAttribute('role', 'status');
+        emptyState.setAttribute('aria-live', 'polite');
+        
+        emptyState.innerHTML = `
+          <div class="w-20 h-20 mx-auto flex items-center justify-center rounded-full bg-primary-light text-primary mb-6 animate-pulse-slow">
+            <i class="fas fa-search text-3xl" aria-hidden="true"></i>
+          </div>
+          <h3 class="text-2xl font-display font-bold mb-2">No recipes found</h3>
+          <p class="text-tertiary">Try adjusting your search or filters</p>
+        `;
+        
+        this.elements.recipeGrid.appendChild(emptyState);
+      },
+      
+      renderRecipeCard(recipe, index, totalRecipes) {
+        const isSaved = this.state.savedRecipes.includes(recipe.id);
+        
+        const card = document.createElement('div');
+        card.className = 'group bg-surface rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 cursor-pointer flex flex-col h-full relative animate-fade-in';
+        card.style.animationDelay = `${index * 0.1}s`;
+        card.setAttribute('role', 'listitem');
+        card.setAttribute('aria-label', recipe.name);
+        card.setAttribute('tabindex', '0');
+        
+        // RESTORED THE "View Recipe" BUTTON as requested
+        card.innerHTML = `
+          <div class="relative overflow-hidden">
+            <img 
+              src="${recipe.image}" 
+              alt="${recipe.name}" 
+              class="h-48 w-full object-cover transition-transform duration-700 group-hover:scale-110"
+            >
+            <div class="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-60"></div>
+            <div class="absolute bottom-0 left-0 right-0 p-4">
+              <span class="category-tag bg-primary text-white inline-flex items-center justify-center h-8 px-4 rounded-full text-xs font-semibold tracking-wider">${recipe.category}</span>
+            </div>
+          </div>
+          <div class="p-5 flex-1 flex flex-col">
+            <div class="flex justify-between items-start mb-2">
+              <div class="text-xs font-medium text-primary">${index + 1}/${totalRecipes}</div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs text-tertiary flex items-center">
+                  <i class="far fa-clock mr-1" aria-hidden="true"></i> ${recipe.prep_time}
+                </span>
+                <span class="text-xs text-tertiary flex items-center">
+                  <i class="fas fa-utensils mr-1" aria-hidden="true"></i> ${recipe.difficulty}
+                </span>
+              </div>
+            </div>
+            <h3 class="text-xl font-display font-bold text-secondary mb-2 leading-tight">${recipe.name}</h3>
+            <p class="text-tertiary text-sm mb-4 flex-grow">
+              ${recipe.description.substring(0, 100)}${recipe.description.length > 100 ? '...' : ''}
+            </p>
+            <div class="flex justify-between items-center mt-auto">
+              <button class="text-primary hover:text-primary-dark transition-colors focus-ring" aria-label="View ${recipe.name} recipe">
+                <span class="text-sm font-medium">View Recipe</span>
+              </button>
+              <button 
+                class="bg-transparent border-none text-2xl transition-colors duration-300 transform hover:scale-110 focus-ring ${isSaved ? 'text-primary' : 'text-tertiary opacity-60 hover:opacity-100'}" 
+                data-id="${recipe.id}"
+                aria-label="${isSaved ? 'Remove from favorites' : 'Save to favorites'}"
+                aria-pressed="${isSaved ? 'true' : 'false'}"
+              >
+                <i class="${isSaved ? 'fas' : 'far'} fa-bookmark" aria-hidden="true"></i>
+              </button>
+            </div>
+          </div>
+        `;
+        
+        // Event delegation for clicks on the card
+        card.addEventListener('click', (e) => {
+          if (!e.target.closest('button[data-id]')) {
+            this.showRecipeDetails(recipe);
+          }
+        });
+        
+        // Handle keyboard navigation
+        card.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            this.showRecipeDetails(recipe);
+          }
+        });
+        
+        // Save button functionality
+        const saveBtn = card.querySelector('button[data-id]');
+        saveBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.toggleSaveRecipe(recipe.id, saveBtn);
+        });
+        
+        this.elements.recipeGrid.appendChild(card);
+      },
+      
+      // ====== UI INTERACTION HANDLERS ======
+      handleFilterClick(category) {
+        // Update active filter
+        this.state.activeFilter = category;
+        
+        // Update filter buttons UI
+        this.renderFilters();
+        
+        // Apply filters
+        this.applyFilters();
+      },
+      
+      toggleSaveRecipe(recipeId, button) {
+        const icon = button.querySelector('i');
+        const isSaved = icon.classList.contains('fas');
+        
+        // Add save/unsave animation
+        button.classList.add('animate-bounce');
+        setTimeout(() => button.classList.remove('animate-bounce'), 500);
+        
+        // Update state
+        if (isSaved) {
+          this.state.savedRecipes = this.state.savedRecipes.filter(id => id !== recipeId);
+          icon.classList.replace('fas', 'far');
+          button.classList.remove('text-primary');
+          button.classList.add('text-tertiary', 'opacity-60', 'hover:opacity-100');
+          button.setAttribute('aria-pressed', 'false');
+          button.setAttribute('aria-label', 'Save to favorites');
+        } else {
+          this.state.savedRecipes.push(recipeId);
+          icon.classList.replace('far', 'fas');
+          button.classList.remove('text-tertiary', 'opacity-60', 'hover:opacity-100');
+          button.classList.add('text-primary');
+          button.setAttribute('aria-pressed', 'true');
+          button.setAttribute('aria-label', 'Remove from favorites');
+        }
+        
+        // Save to localStorage with error handling
+        try {
+          localStorage.setItem('saved_recipes', JSON.stringify(this.state.savedRecipes));
+        } catch (e) {
+          console.error('Unable to save to localStorage:', e);
+          // Optionally display an error message to the user
+        }
+        
+        // If we're in favorites view, update the list
+        if (this.state.activeFilter === 'favorites') {
+          this.applyFilters();
+        }
+      },
+      
+      // ====== RECIPE DETAILS ======
+      showRecipeDetails(recipe) {
+        // Set loading state
+        this.state.isLoading = true;
+        
+        // Fade out current content
+        this.elements.detailsContent.style.opacity = '0';
+        this.elements.noSelection.style.opacity = '0';
+        
+        setTimeout(() => {
+          // Update state
+          this.state.currentRecipe = recipe;
+          
+          // Update DOM
+          this.elements.noSelection.classList.add('hidden');
+          this.elements.detailsContent.classList.remove('hidden');
+          
+          // Render details content
+          this.renderRecipeDetails(recipe);
+          
+          // Show with animation
+          setTimeout(() => {
+            this.elements.detailsContent.style.transition = 'opacity 0.5s ease-out';
+            this.elements.detailsContent.style.opacity = '1';
+            this.state.isLoading = false;
+          }, 50);
+          
+          // Scroll to details on mobile
+          if (window.innerWidth < 768) {
+            this.elements.recipeDetails.scrollIntoView({ behavior: 'smooth' });
+          }
+        }, 300);
+      },
+      
+      renderRecipeDetails(recipe) {
+        // Create detailed content
+        this.elements.detailsContent.innerHTML = `
+          <div class="relative">
+            <div class="h-64 md:h-80 bg-gradient-to-r from-primary/20 to-primary-light/20">
+              <img src="${recipe.image}" alt="${recipe.name}" class="h-full w-full object-cover">
+              <div class="absolute inset-0 bg-gradient-to-t from-surface via-transparent to-transparent"></div>
+            </div>
+            
+            <div class="absolute top-4 left-4 flex space-x-2">
+              <span class="category-tag bg-primary text-white h-8 px-4 rounded-full text-xs font-semibold tracking-wider shadow-md">${recipe.category}</span>
+              <button 
+                id="save-recipe-btn" 
+                class="flex items-center justify-center w-8 h-8 rounded-full bg-white/90 shadow-md text-lg transition-colors focus-ring ${this.state.savedRecipes.includes(recipe.id) ? 'text-primary' : 'text-tertiary hover:text-primary'}"
+                aria-label="${this.state.savedRecipes.includes(recipe.id) ? 'Remove from favorites' : 'Save to favorites'}"
+                aria-pressed="${this.state.savedRecipes.includes(recipe.id) ? 'true' : 'false'}"
+              >
+                <i class="${this.state.savedRecipes.includes(recipe.id) ? 'fas' : 'far'} fa-bookmark" aria-hidden="true"></i>
+              </button>
+            </div>
+          </div>
+          
+          <div class="px-6 pt-6 pb-4 -mt-10 relative">
+            <div class="bg-white rounded-xl shadow-xl p-6 mb-8 transform transition-all duration-500 hover:shadow-2xl">
+              <h2 class="text-3xl md:text-4xl font-display font-bold text-secondary mb-4 leading-tight">${recipe.name}</h2>
+              <p class="text-tertiary text-lg leading-relaxed mb-6">${recipe.description}</p>
+              
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+                <div class="flex flex-col items-center p-3 rounded-lg bg-primary-light/30">
+                  <span class="text-primary"><i class="far fa-clock text-xl" aria-hidden="true"></i></span>
+                  <span class="text-xs uppercase tracking-wide text-tertiary mt-1">Prep Time</span>
+                  <span class="font-medium text-secondary">${recipe.prep_time}</span>
+                </div>
+                <div class="flex flex-col items-center p-3 rounded-lg bg-primary-light/30">
+                  <span class="text-primary"><i class="fas fa-fire text-xl" aria-hidden="true"></i></span>
+                  <span class="text-xs uppercase tracking-wide text-tertiary mt-1">Cook Time</span>
+                  <span class="font-medium text-secondary">${recipe.cook_time}</span>
+                </div>
+                <div class="flex flex-col items-center p-3 rounded-lg bg-primary-light/30">
+                  <span class="text-primary"><i class="fas fa-users text-xl" aria-hidden="true"></i></span>
+                  <span class="text-xs uppercase tracking-wide text-tertiary mt-1">Servings</span>
+                  <span class="font-medium text-secondary">${recipe.servings}</span>
+                </div>
+                <div class="flex flex-col items-center p-3 rounded-lg bg-primary-light/30">
+                  <span class="text-primary"><i class="fas fa-chart-line text-xl" aria-hidden="true"></i></span>
+                  <span class="text-xs uppercase tracking-wide text-tertiary mt-1">Difficulty</span>
+                  <span class="font-medium text-secondary">${recipe.difficulty}</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="mb-8">
+              <div 
+                class="recipe-toggle flex justify-between items-center bg-white rounded-xl shadow-md p-5 cursor-pointer transition-all hover:shadow-lg focus-ring" 
+                data-target="ingredients"
+                role="button" 
+                aria-expanded="true" 
+                aria-controls="ingredients-section"
+                tabindex="0"
+              >
+                <h3 class="text-xl font-display font-bold text-secondary flex items-center">
+                  <span class="flex items-center justify-center w-8 h-8 rounded-full bg-primary-light text-primary mr-3">
+                    <i class="fas fa-shopping-basket text-sm" aria-hidden="true"></i>
+                  </span>
+                  Ingredients
+                </h3>
+                <i class="fas fa-chevron-down text-primary transition-transform duration-300" aria-hidden="true"></i>
+              </div>
+              <div class="recipe-section bg-white rounded-xl shadow-md p-5" id="ingredients-section" role="region" aria-labelledby="ingredients-heading">
+                <ul class="divide-y divide-gray-100">
+                  ${recipe.ingredients.map(item => `
+                    <li class="py-3 flex items-start">
+                      <span class="inline-flex items-center justify-center flex-shrink-0 w-5 h-5 mr-3 mt-0.5 rounded bg-primary-light text-primary">
+                        <i class="fas fa-check text-xs" aria-hidden="true"></i>
+                      </span>
+                      <span>${item}</span>
+                    </li>
+                  `).join('')}
+                </ul>
+              </div>
+            </div>
+            
+            <div class="mb-8">
+              <div 
+                class="recipe-toggle flex justify-between items-center bg-white rounded-xl shadow-md p-5 cursor-pointer transition-all hover:shadow-lg focus-ring" 
+                data-target="instructions"
+                role="button" 
+                aria-expanded="true" 
+                aria-controls="instructions-section"
+                tabindex="0"
+              >
+                <h3 class="text-xl font-display font-bold text-secondary flex items-center" id="instructions-heading">
+                  <span class="flex items-center justify-center w-8 h-8 rounded-full bg-primary-light text-primary mr-3">
+                    <i class="fas fa-list-ol text-sm" aria-hidden="true"></i>
+                  </span>
+                  Instructions
+                </h3>
+                <i class="fas fa-chevron-down text-primary transition-transform duration-300" aria-hidden="true"></i>
+              </div>
+              <div class="recipe-section bg-white rounded-xl shadow-md p-5" id="instructions-section" role="region" aria-labelledby="instructions-heading">
+                <div class="instructions-content">
+                  <ol class="relative">
+                    ${recipe.instructions.map((step, idx) => `
+                      <li class="mb-6 pb-6 ${idx < recipe.instructions.length - 1 ? 'border-b border-gray-100' : ''} pl-10 relative">
+                        <span class="absolute left-0 top-0 flex items-center justify-center w-7 h-7 rounded-full bg-primary text-white font-bold">${idx + 1}</span>
+                        <p>${step}</p>
+                      </li>
+                    `).join('')}
+                  </ol>
+                </div>
+              </div>
+            </div>
+            
+            <div class="flex space-x-3 mb-10">
+              <button 
+                class="flex-1 bg-gradient-to-r from-primary to-primary-dark text-white font-medium py-3 px-6 rounded-lg transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 flex items-center justify-center focus-ring"
+                aria-label="Print recipe"
+              >
+                <i class="fas fa-print mr-2" aria-hidden="true"></i> Print Recipe
+              </button>
+              <button 
+                class="bg-white text-primary border-2 border-primary-light font-medium py-3 px-6 rounded-lg transition-all duration-300 hover:bg-primary-light hover:border-primary flex items-center justify-center focus-ring"
+                aria-label="Share recipe"
+              >
+                <i class="fas fa-share-alt mr-2" aria-hidden="true"></i> Share
+              </button>
+            </div>
+            
+            <!-- Personal Notes Section - Completely redesigned -->
+            <div class="bg-primary-light/20 p-6 rounded-xl" id="notes-container">
+              <!-- Notes Header - Always visible -->
+              <div class="flex items-center justify-between mb-5">
+                <h4 class="flex items-center text-xl font-display font-bold text-secondary" id="notes-heading">
+                  <i class="fas fa-edit mr-3 text-primary" aria-hidden="true"></i> 
+                  Personal Notes
+                </h4>
+              </div>
+              
+              <!-- Notes content wrapper - Contains both view and edit modes -->
+              <div id="notes-content-wrapper" role="region" aria-labelledby="notes-heading">
+                <!-- Notes View Mode -->
+                <div id="notes-view-mode" class="${this.state.notes[recipe.id] ? 'block' : 'hidden'}">
+                  <div class="bg-white p-4 rounded-lg shadow-inner mb-4 min-h-24">
+                    <p id="notes-text" class="whitespace-pre-wrap text-tertiary">${this.state.notes[recipe.id] || ''}</p>
+                  </div>
+                  <button 
+                    id="edit-notes-btn" 
+                    class="bg-secondary text-white font-medium py-2 px-5 rounded-lg transition-all duration-300 hover:bg-primary transform hover:-translate-y-1 flex items-center focus-ring"
+                    aria-label="Edit personal notes"
+                  >
+                    <i class="fas fa-pencil-alt mr-2" aria-hidden="true"></i> Edit Notes
+                  </button>
+                </div>
+                
+                <!-- Notes Edit Mode -->
+                <div id="notes-edit-mode" class="${this.state.notes[recipe.id] ? 'hidden' : 'block'}">
+                  <label for="notes-textarea" class="sr-only">Personal notes for ${recipe.name}</label>
+                  <textarea 
+                    id="notes-textarea" 
+                    class="w-full min-h-32 border border-primary-light rounded-lg p-4 text-tertiary resize-y font-body bg-white focus:outline-none focus:ring-2 focus:ring-primary mb-4 shadow-inner focus-ring"
+                    placeholder="Add your personal notes, tips, or variations here..."
+                    aria-label="Personal notes for ${recipe.name}"
+                  >${this.state.notes[recipe.id] || ''}</textarea>
+                  <div class="flex justify-between items-center">
+                    <div class="flex space-x-3">
+                      <button 
+                        id="save-notes-btn" 
+                        class="bg-gradient-to-r from-primary to-primary-dark text-white font-medium py-2 px-5 rounded-lg transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 flex items-center disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none focus-ring"
+                        aria-label="Save notes"
+                      >
+                        <i class="fas fa-save mr-2" aria-hidden="true"></i> Save Notes
+                      </button>
+                      
+                      <button 
+                        id="cancel-edit-btn" 
+                        class="bg-white border border-gray-300 text-tertiary font-medium py-2 px-5 rounded-lg transition-all duration-300 hover:bg-gray-100 flex items-center focus-ring ${this.state.notes[recipe.id] ? 'block' : 'hidden'}"
+                        aria-label="Cancel editing"
+                      >
+                        <i class="fas fa-times mr-2" aria-hidden="true"></i> Cancel
+                      </button>
+                    </div>
+                    <span id="save-message" class="text-sm text-green-600" aria-live="polite"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+        
+        // Set up event listeners for the detailed view
+        this.setupRecipeDetailsListeners(recipe);
+      },
+      
+      setupRecipeDetailsListeners(recipe) {
+        // Save Recipe button
+        const saveRecipeBtn = document.getElementById('save-recipe-btn');
+        if (saveRecipeBtn) {
+          saveRecipeBtn.addEventListener('click', () => {
+            this.handleDetailsSaveButton(recipe.id, saveRecipeBtn);
+          });
+        }
+        
+        // Set up collapsible sections
+        document.querySelectorAll('.recipe-toggle').forEach(toggle => {
+          this.setupCollapsibleSection(toggle);
+        });
+
+        // Set up notes functionality
+        this.setupNotesSection(recipe);
+        
+        // Keyboard accessibility for collapsible sections
+        document.querySelectorAll('.recipe-toggle').forEach(toggle => {
+          toggle.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              toggle.click();
+            }
+          });
+        });
+      },
+      
+      setupCollapsibleSection(toggle) {
+        const targetId = toggle.dataset.target;
+        const sectionId = `${targetId}-section`;
+        const section = document.getElementById(sectionId);
+        const icon = toggle.querySelector('i.fas');
+        
+        toggle.addEventListener('click', () => {
+          const isExpanded = toggle.getAttribute('aria-expanded') === 'true';
+          
+          // Toggle section visibility
+          section.classList.toggle('collapsed');
+          icon.classList.toggle('rotate-180');
+          
+          // Update ARIA attributes
+          toggle.setAttribute('aria-expanded', isExpanded ? 'false' : 'true');
+        });
+      },
+      
+      setupNotesSection(recipe) {
+        const notesViewMode = document.getElementById('notes-view-mode');
+        const notesEditMode = document.getElementById('notes-edit-mode');
+        const editNotesBtn = document.getElementById('edit-notes-btn');
+        const saveNotesBtn = document.getElementById('save-notes-btn');
+        const cancelEditBtn = document.getElementById('cancel-edit-btn');
+        const notesText = document.getElementById('notes-text');
+        const notesTextarea = document.getElementById('notes-textarea');
+        const saveMessage = document.getElementById('save-message');
+        
+        // Initial state setup for Save Notes button
+        this.updateSaveButtonState(notesTextarea, saveNotesBtn);
+        
+        // Listen for textarea changes
+        notesTextarea.addEventListener('input', () => {
+          this.updateSaveButtonState(notesTextarea, saveNotesBtn);
+        });
+
+        // Switch to edit mode
+        if (editNotesBtn) {
+          editNotesBtn.addEventListener('click', () => {
+            this.switchToNotesEditMode(recipe.id, notesTextarea, notesViewMode, notesEditMode);
+          });
+        }
+        
+        // Cancel edit - switch back to view mode
+        if (cancelEditBtn) {
+          cancelEditBtn.addEventListener('click', () => {
+            this.cancelNotesEdit(recipe.id, notesTextarea, notesViewMode, notesEditMode, cancelEditBtn);
+          });
+        }
+        
+        // Save notes
+        if (saveNotesBtn) {
+          saveNotesBtn.addEventListener('click', () => {
+            this.saveNotes(recipe.id, notesTextarea, notesText, notesViewMode, notesEditMode, cancelEditBtn, saveMessage);
+          });
+        }
+        
+        // Keyboard support for notes textarea
+        notesTextarea.addEventListener('keydown', (e) => {
+          // Ctrl+Enter to save
+          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            saveNotesBtn.click();
+          }
+          
+          // Escape to cancel
+          if (e.key === 'Escape' && this.state.notes[recipe.id]) {
+            e.preventDefault();
+            cancelEditBtn.click();
+          }
+        });
+      },
+      
+      // ====== NOTES HANDLING ======
+      updateSaveButtonState(textarea, saveButton) {
+        const hasContent = textarea.value.trim() !== '';
+        saveButton.disabled = !hasContent;
+        
+        if (hasContent) {
+          textarea.classList.add('border-primary');
+        } else {
+          textarea.classList.remove('border-primary');
+        }
+      },
+      
+      switchToNotesEditMode(recipeId, textarea, viewMode, editMode) {
+        // Update textarea with current notes
+        textarea.value = this.state.notes[recipeId] || '';
+        
+        // Switch display
+        viewMode.classList.add('hidden');
+        editMode.classList.remove('hidden');
+        
+        // Focus textarea and set cursor at end
+        textarea.focus();
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+      },
+      
+      cancelNotesEdit(recipeId, textarea, viewMode, editMode, cancelBtn) {
+        if (this.state.notes[recipeId]) {
+          // Switch back to view mode
+          editMode.classList.add('hidden');
+          viewMode.classList.remove('hidden');
+        } else {
+          // If no notes, clear textarea
+          textarea.value = '';
+          this.updateSaveButtonState(textarea, document.getElementById('save-notes-btn'));
+        }
+      },
+      
+      saveNotes(recipeId, textarea, notesText, viewMode, editMode, cancelBtn, saveMessage) {
+        const newNotes = textarea.value.trim();
+        
+        // Update notes state
+        if (newNotes === '') {
+          delete this.state.notes[recipeId];
+        } else {
+          this.state.notes[recipeId] = newNotes;
+        }
+        
+        // Save to localStorage
+        try {
+          localStorage.setItem('recipe_notes', JSON.stringify(this.state.notes));
+          
+          // Show success message with animation
+          saveMessage.textContent = 'Notes saved!';
+          saveMessage.setAttribute('role', 'status');
+          
+          // Clear message after a delay
+          setTimeout(() => {
+            saveMessage.textContent = '';
+            saveMessage.removeAttribute('role');
+          }, 2000);
+          
+        } catch (e) {
+          console.error('Unable to save notes to localStorage:', e);
+          saveMessage.textContent = 'Unable to save notes';
+          saveMessage.className = 'text-sm text-red-600';
+          return;
+        }
+        
+        // Update UI based on whether we have notes or not
+        if (this.state.notes[recipeId]) {
+          // Update view mode text
+          notesText.textContent = this.state.notes[recipeId];
+          
+          // Show view mode, hide edit mode
+          viewMode.classList.remove('hidden');
+          editMode.classList.add('hidden');
+          
+          // Update cancel button state for next time
+          cancelBtn.classList.remove('hidden');
+        } else {
+          // If deleted all notes, stay in edit mode but clear textarea
+          textarea.value = '';
+          textarea.focus();
+          
+          // Hide cancel button since there are no saved notes
+          cancelBtn.classList.add('hidden');
+        }
+      },
+      
+      // ====== BOOKMARK HANDLING IN DETAILS VIEW ======
+      handleDetailsSaveButton(recipeId, button) {
+        const icon = button.querySelector('i');
+        const isSaved = icon.classList.contains('fas');
+        
+        // Add save/unsave animation
+        button.classList.add('animate-bounce');
+        setTimeout(() => button.classList.remove('animate-bounce'), 500);
+        
+        // Update state
+        if (isSaved) {
+          this.state.savedRecipes = this.state.savedRecipes.filter(id => id !== recipeId);
+          icon.classList.replace('fas', 'far');
+          button.classList.remove('text-primary');
+          button.classList.add('text-tertiary', 'hover:text-primary');
+          button.setAttribute('aria-pressed', 'false');
+          button.setAttribute('aria-label', 'Save to favorites');
+        } else {
+          this.state.savedRecipes.push(recipeId);
+          icon.classList.replace('far', 'fas');
+          button.classList.remove('text-tertiary', 'hover:text-primary');
+          button.classList.add('text-primary');
+          button.setAttribute('aria-pressed', 'true');
+          button.setAttribute('aria-label', 'Remove from favorites');
+        }
+        
+        // Save to localStorage
+        try {
+          localStorage.setItem('saved_recipes', JSON.stringify(this.state.savedRecipes));
+          
+          // Update recipe card save button if visible
+          const cardSaveBtn = document.querySelector(`button[data-id="${recipeId}"]`);
+          if (cardSaveBtn) {
+            const cardIcon = cardSaveBtn.querySelector('i');
+            if (isSaved) {
+              cardIcon.classList.replace('fas', 'far');
+              cardSaveBtn.classList.remove('text-primary');
+              cardSaveBtn.classList.add('text-tertiary', 'opacity-60', 'hover:opacity-100');
+              cardSaveBtn.setAttribute('aria-pressed', 'false');
+            } else {
+              cardIcon.classList.replace('far', 'fas');
+              cardSaveBtn.classList.remove('text-tertiary', 'opacity-60', 'hover:opacity-100');
+              cardSaveBtn.classList.add('text-primary');
+              cardSaveBtn.setAttribute('aria-pressed', 'true');
+            }
+          }
+        } catch (e) {
+          console.error('Unable to save to localStorage:', e);
+          // Optionally display an error message
+        }
+      },
+
+      debounce(func, wait) {
+        let timeout;
+        return function(...args) {
+          clearTimeout(timeout);
+          timeout = setTimeout(() => func.apply(this, args), wait);
+        };
+      }
+    };
+
+    document.addEventListener('DOMContentLoaded', () => RecipeBookApp.init());
+  </script>
+</body>
+</html>

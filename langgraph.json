@@ -1,0 +1,7 @@
+{
+    "dependencies": ["."],
+    "graphs": {
+        "recipe_extraction_agent": "./agent.py:graph"
+    },
+    "env": ".env"
+}
