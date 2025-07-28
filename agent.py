@@ -87,19 +87,27 @@ def rate_limited_llm_call(delay_seconds: float = 0.2):
         return wrapper
     return decorator
 
+def keep_first_value(current, new):
+    if current is not None and current != '':
+        return current
+    return new if new is not None else current
+
+def keep_latest_value(current, new):
+    return new if new is not None else current
+
 class RecipeState(TypedDict):
     messages: Annotated[list, add_messages]
-    youtube_url: str
-    video_id: Optional[str]
-    transcript: Optional[str]
-    raw_recipe: Optional[dict]
-    validated_recipe: Optional[dict]
-    image_url: Optional[str]
-    final_recipe: Optional[dict]
-    current_step: str
-    error: Optional[str]
-    performance: Optional[dict]
-    search_decisions: Optional[dict]
+    youtube_url: Annotated[str, keep_first_value]
+    video_id: Annotated[Optional[str], keep_first_value]
+    transcript: Annotated[Optional[str], keep_first_value]
+    raw_recipe: Annotated[Optional[dict], keep_first_value]
+    validated_recipe: Annotated[Optional[dict], keep_latest_value]
+    image_url: Annotated[Optional[str], keep_latest_value]
+    final_recipe: Annotated[Optional[dict], keep_latest_value]
+    current_step: Annotated[str, keep_latest_value]
+    error: Annotated[Optional[str], keep_latest_value]
+    performance: Annotated[Optional[dict], keep_latest_value]
+    search_decisions: Annotated[Optional[dict], keep_latest_value]
 
 class Recipe(BaseModel):
     name: str
