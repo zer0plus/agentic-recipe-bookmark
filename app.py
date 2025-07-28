@@ -6,7 +6,7 @@ from agent import RecipeAgent
 import uvicorn
 import logging
 import asyncio
-from typing import Optional
+from typing import Optional, Literal
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="Recipe Extractor", 
     description="Extract recipes from YouTube videos using intelligent LLM agents",
-    version="2.0.0"
+    version="2.1.0"  # Updated version for image gen feature
 )
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -32,6 +32,7 @@ def get_agent() -> RecipeAgent:
 
 class YouTubeRequest(BaseModel):
     youtube_url: HttpUrl
+    image_type: Literal["ai", "stock"]  # NEW: Image type selection
 
 class RecipeResponse(BaseModel):
     id: int
@@ -54,11 +55,15 @@ async def root():
 async def extract_recipe(request: YouTubeRequest):
     try:
         logger.info(f"🚀 Starting recipe extraction from: {request.youtube_url}")
+        logger.info(f"🎨 Image type selected: {request.image_type}")
         
         agent = get_agent()
         
-        # Use agent to extract recipe with tool orchestration
-        recipe_data = await agent.extract_recipe_from_youtube(str(request.youtube_url))
+        # Pass both URL and image type to agent
+        recipe_data = await agent.extract_recipe_from_youtube(
+            str(request.youtube_url), 
+            image_type=request.image_type
+        )
         
         if not recipe_data:
             logger.error("Agent returned empty recipe data")
@@ -68,6 +73,7 @@ async def extract_recipe(request: YouTubeRequest):
             )
         
         logger.info(f"✅ Recipe extraction completed: {recipe_data['name']}")
+        logger.info(f"🖼️ Image generated using: {request.image_type} method")
         return recipe_data
         
     except ValueError as e:
@@ -95,7 +101,8 @@ async def health_check():
             "status": "healthy",
             "agent_initialized": True,
             "tools_count": len(agent.tools),
-            "llm_model": "llama3-8b-8192"
+            "llm_model": "llama3-8b-8192",
+            "features": ["ai_image_generation", "stock_images"]  # NEW: Feature list
         }
     except Exception as e:
         logger.error(f"Health check failed: {e}")
@@ -117,10 +124,11 @@ async def agent_info():
                 "dynamic_tool_orchestration",
                 "intelligent_workflow_routing", 
                 "error_recovery",
-                "langsmith_monitoring"
+                "langsmith_monitoring",
+                "ai_image_generation"  # NEW: Added capability
             ],
             "workflow_type": "agentic",
-            "description": "Intelligent agent that dynamically decides which tools to call based on context"
+            "description": "Intelligent agent with AI image generation and stock photo capabilities"
         }
     except Exception as e:
         logger.error(f"Error getting agent info: {e}")

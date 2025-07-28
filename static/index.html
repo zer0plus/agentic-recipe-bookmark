@@ -315,12 +315,43 @@
           </p>
         </div>
 
+          <!-- NEW: Image Type Selection -->
+        <div class="mb-6">
+          <label class="block text-sm font-medium text-gray-700 mb-3">
+            Recipe Image Type
+          </label>
+          <div class="flex space-x-3">
+            <button 
+              type="button"
+              id="ai-image-toggle" 
+              class="flex-1 py-3 px-4 text-sm font-medium rounded-lg border-2 transition-all duration-200 focus-ring flex items-center justify-center space-x-2 border-gray-200 text-gray-600 hover:border-purple-300 hover:text-purple-600"
+              aria-pressed="false"
+            >
+              <i class="fas fa-magic" aria-hidden="true"></i>
+              <span>🎨 AI Generated</span>
+            </button>
+            <button 
+              type="button"
+              id="stock-image-toggle" 
+              class="flex-1 py-3 px-4 text-sm font-medium rounded-lg border-2 transition-all duration-200 focus-ring flex items-center justify-center space-x-2 border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600"
+              aria-pressed="false"
+            >
+              <i class="fas fa-camera" aria-hidden="true"></i>
+              <span>📸 Stock Photo</span>
+            </button>
+          </div>
+          <p class="mt-2 text-xs text-gray-500">
+            Choose between AI-generated food images or stock photography
+          </p>
+        </div>  
+            
         <!-- Modal Actions -->
         <div class="flex space-x-3">
           <button 
             id="extract-recipe-btn" 
-            class="flex-1 bg-gradient-to-r from-red-500 to-red-600 text-white py-3 px-4 rounded-full text-sm font-medium transition-all duration-200 hover:from-red-600 hover:to-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center focus-ring"
+            class="flex-1 bg-gradient-to-r from-red-500 to-red-600 text-white py-3 px-4 rounded-full text-sm font-medium transition-all duration-200 hover:from-red-600 hover:to-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center focus-ring opacity-50 cursor-not-allowed"
             aria-label="Extract recipe from YouTube video"
+            disabled
           >
             <i class="fas fa-magic mr-2" aria-hidden="true"></i>
             Extract Recipe
@@ -726,7 +757,26 @@
             this.closeYouTubeModal();
           }
         });
+
+        this.selectedImageType = null; // Add this to track selection
+        const aiToggle = document.getElementById('ai-image-toggle');
+        const stockToggle = document.getElementById('stock-image-toggle');
         
+        // Handle AI image toggle
+        aiToggle.addEventListener('click', () => {
+          this.selectImageType('ai', aiToggle, stockToggle);
+        });
+        
+        // Handle stock image toggle  
+        stockToggle.addEventListener('click', () => {
+          this.selectImageType('stock', stockToggle, aiToggle);
+        });
+
+        // Update URL input listener to check both URL and image type
+        this.elements.youtubeUrlInput.addEventListener('input', () => {
+          this.updateExtractButtonState();
+        });
+              
         // Extract recipe functionality
         this.elements.extractRecipeBtn.addEventListener('click', async () => {
           const url = this.elements.youtubeUrlInput.value.trim();
@@ -750,6 +800,44 @@
           }
         });
       },
+
+      selectImageType(type, activeButton, inactiveButton) {
+        this.selectedImageType = type;
+        
+        // Update active button
+        activeButton.classList.remove('border-gray-200', 'text-gray-600');
+        activeButton.classList.add(
+          type === 'ai' ? 'border-purple-500' : 'border-blue-500',
+          type === 'ai' ? 'text-purple-600' : 'text-blue-600',
+          type === 'ai' ? 'bg-purple-50' : 'bg-blue-50'
+        );
+        activeButton.setAttribute('aria-pressed', 'true');
+        
+        // Update inactive button
+        inactiveButton.classList.remove(
+          'border-purple-500', 'border-blue-500', 
+          'text-purple-600', 'text-blue-600',
+          'bg-purple-50', 'bg-blue-50'
+        );
+        inactiveButton.classList.add('border-gray-200', 'text-gray-600');
+        inactiveButton.setAttribute('aria-pressed', 'false');
+        
+        // Update extract button state
+        this.updateExtractButtonState();
+      },
+
+      updateExtractButtonState() {
+        const hasUrl = this.elements.youtubeUrlInput.value.trim() !== '';
+        const hasImageType = this.selectedImageType !== null;
+        
+        if (hasUrl && hasImageType) {
+          this.elements.extractRecipeBtn.disabled = false;
+          this.elements.extractRecipeBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        } else {
+          this.elements.extractRecipeBtn.disabled = true;
+          this.elements.extractRecipeBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        }
+      },
       
       openYouTubeModal() {
         this.elements.youtubeModal.classList.remove('hidden');
@@ -771,8 +859,25 @@
         // Clear the input
         this.elements.youtubeUrlInput.value = '';
         
+        // NEW: Reset image type selection
+        this.selectedImageType = null;
+        const aiToggle = document.getElementById('ai-image-toggle');
+        const stockToggle = document.getElementById('stock-image-toggle');
+        
+        // Reset both buttons to default state
+        [aiToggle, stockToggle].forEach(button => {
+          button.classList.remove(
+            'border-purple-500', 'border-blue-500', 
+            'text-purple-600', 'text-blue-600',
+            'bg-purple-50', 'bg-blue-50'
+          );
+          button.classList.add('border-gray-200', 'text-gray-600');
+          button.setAttribute('aria-pressed', 'false');
+        });
+        
         // Reset extract button
-        this.elements.extractRecipeBtn.disabled = false;
+        this.elements.extractRecipeBtn.disabled = true;
+        this.elements.extractRecipeBtn.classList.add('opacity-50', 'cursor-not-allowed');
         this.elements.extractRecipeBtn.innerHTML = '<i class="fas fa-magic mr-2" aria-hidden="true"></i>Extract Recipe';
         
         // Restore body scroll
@@ -801,7 +906,10 @@
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ youtube_url: url })
+            body: JSON.stringify({ 
+              youtube_url: url,
+              image_type: this.selectedImageType  // This sends 'ai' or 'stock'
+            })
           });
           
           if (!response.ok) {

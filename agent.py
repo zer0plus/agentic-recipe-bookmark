@@ -20,6 +20,7 @@ from langgraph.graph import StateGraph, END, START
 from langgraph.graph.message import add_messages
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import ToolNode
+from youtube_transcript_api.proxies import GenericProxyConfig
 
 from langsmith import Client
 from langchain.callbacks.tracers import LangChainTracer
@@ -35,18 +36,12 @@ os.environ["LANGSMITH_PROJECT"] = "moms-cook-book-streamlined"
 class PerformanceTracker:
     def __init__(self):
         self.start_time = None
-        self.step_times = {}
         self.llm_calls = 0
         self.tool_calls = 0
     
     def start(self):
         self.start_time = time.time()
         return self
-    
-    def step(self, step_name: str):
-        if self.start_time:
-            self.step_times[step_name] = time.time() - self.start_time
-            logger.info(f"⏱️ {step_name}: {self.step_times[step_name]:.2f}s")
     
     def llm_call(self):
         self.llm_calls += 1
@@ -56,13 +51,10 @@ class PerformanceTracker:
     
     def summary(self):
         total_time = time.time() - self.start_time if self.start_time else 0
-        logger.info(f"🏁 Total extraction time: {total_time:.2f}s")
-        logger.info(f"📊 LLM calls: {self.llm_calls}, Tool calls: {self.tool_calls}")
         return {
             "total_time": total_time,
             "llm_calls": self.llm_calls,
-            "tool_calls": self.tool_calls,
-            "step_times": self.step_times
+            "tool_calls": self.tool_calls
         }
 
 def rate_limited_llm_call(delay_seconds: float = 0.2):
@@ -98,6 +90,7 @@ def keep_latest_value(current, new):
 class RecipeState(TypedDict):
     messages: Annotated[list, add_messages]
     youtube_url: Annotated[str, keep_first_value]
+    image_type: Annotated[str, keep_first_value]  # NEW: Track image type preference
     video_id: Annotated[Optional[str], keep_first_value]
     transcript: Annotated[Optional[str], keep_first_value]
     raw_recipe: Annotated[Optional[dict], keep_first_value]
@@ -123,8 +116,11 @@ class Recipe(BaseModel):
 
 @tool
 def get_transcript_from_youtube_url_tool(youtube_url: str) -> dict:
-    """Extract video ID and get transcript efficiently"""
+    """Extract video ID and get transcript efficiently with proxy support"""
+    import urllib.parse  # Add this import
+    
     try:
+        # Fast video ID extraction (your existing code)
         patterns = [
             r'(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)',
             r'youtube\.com\/watch\?.*v=([^&\n?#]+)'
@@ -140,7 +136,26 @@ def get_transcript_from_youtube_url_tool(youtube_url: str) -> dict:
         if not video_id:
             raise ValueError("Invalid YouTube URL format")
         
-        ytt_api = YouTubeTranscriptApi()
+        # Configure proxy using the CORRECT API with URL encoding
+        if os.getenv("PROXY_HOST"):
+            from youtube_transcript_api.proxies import GenericProxyConfig
+            
+            # URL encode username and password - THIS IS THE FIX
+            username = urllib.parse.quote(os.getenv('PROXY_USERNAME'), safe='')
+            password = urllib.parse.quote(os.getenv('PROXY_PASSWORD'), safe='')
+            
+            proxy_url = f"http://{username}:{password}@{os.getenv('PROXY_HOST')}:{os.getenv('PROXY_PORT')}"
+            
+            proxy_config = GenericProxyConfig(
+                http_url=proxy_url,
+                https_url=proxy_url
+            )
+            
+            ytt_api = YouTubeTranscriptApi(proxy_config=proxy_config)
+        else:
+            ytt_api = YouTubeTranscriptApi()
+        
+        # Rest of your existing code...
         fetched_transcript = ytt_api.fetch(video_id)
         transcript_data = fetched_transcript.to_raw_data()
         
@@ -148,11 +163,8 @@ def get_transcript_from_youtube_url_tool(youtube_url: str) -> dict:
         full_transcript = re.sub(r'\[.*?\]', '', full_transcript)
         full_transcript = re.sub(r'\s+', ' ', full_transcript).strip()
         
-        # Truncate for efficiency
-        if len(full_transcript) > 8000:
-            full_transcript = full_transcript[:8000] + "..."
-        
-        logger.info(f"🎬 Video ID: {video_id}, Transcript: {len(full_transcript)} chars")
+        if len(full_transcript) > 7000:
+            full_transcript = full_transcript[:7000] + "..."
         
         return {
             "video_id": video_id,
@@ -162,6 +174,7 @@ def get_transcript_from_youtube_url_tool(youtube_url: str) -> dict:
     except Exception as e:
         logger.error(f"Transcript extraction failed: {e}")
         raise ValueError(f"Could not retrieve transcript: {e}")
+        
 
 @tool
 def efficient_tavily_search_tool(query: str, search_type: str = "text", max_results: int = 3) -> dict:
@@ -177,7 +190,6 @@ def efficient_tavily_search_tool(query: str, search_type: str = "text", max_resu
             return {"type": search_type, "found": False, "error": "API key not configured"}
         
         tavily_client = TavilyClient(api_key=tavily_api_key)
-        logger.info(f"🔍 Fast search: {query[:50]}... (type: {search_type})")
         
         if search_type == "image":
             search_results = tavily_client.search(
@@ -191,7 +203,6 @@ def efficient_tavily_search_tool(query: str, search_type: str = "text", max_resu
                 for image_url in search_results['images'][:max_results]:
                     if 'images.unsplash.com' in image_url:
                         formatted_url = f"{image_url.split('?')[0]}?w=900&auto=format&fit=crop&q=60"
-                        logger.info(f"✅ Found image: {formatted_url}")
                         return {"type": "image", "url": formatted_url, "found": True}
                 
                 if search_results['images']:
@@ -199,7 +210,7 @@ def efficient_tavily_search_tool(query: str, search_type: str = "text", max_resu
             
             fallback_images = [
                 "https://images.unsplash.com/photo-1556909114-6bca3ebce58b?w=900&auto=format&fit=crop&q=60",
-                "https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=900&auto=format&fit=crop&q=60"
+                    "https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=900&auto=format&fit=crop&q=60"
             ]
             return {"type": "image", "url": random.choice(fallback_images), "found": False}
         
@@ -214,7 +225,7 @@ def efficient_tavily_search_tool(query: str, search_type: str = "text", max_resu
             timing_data = {"prep_time": None, "cook_time": None}
             
             if search_results and 'results' in search_results:
-                for result in search_results['results'][:max_results]:  # Limit processing
+                for result in search_results['results'][:max_results]:
                     text = (result.get('content', '') + " " + result.get('title', '')).lower()
                     
                     if not timing_data["prep_time"]:
@@ -227,7 +238,6 @@ def efficient_tavily_search_tool(query: str, search_type: str = "text", max_resu
                         if cook_match:
                             timing_data["cook_time"] = f"{cook_match.group(1)} min"
             
-            logger.info(f"⏱️ Found timing: {timing_data}")
             result = {"type": "text", "found": True}
             result.update(timing_data)
             return result
@@ -262,6 +272,36 @@ class RecipeAgent:
         
         # Build optimized graph
         self.app = self._build_streamlined_graph()
+
+    def _preprocess_json_text(self, json_text: str) -> str:
+        """Fix common JSON issues before parsing"""
+        # Fix servings ranges like "22-24" -> "23" (take average)
+        def fix_servings_range(match):
+            range_str = match.group(1)
+            if '-' in range_str:
+                try:
+                    start, end = map(int, range_str.split('-'))
+                    avg = (start + end) // 2
+                    return f'"servings": {avg}'
+                except:
+                    return f'"servings": 4'  # fallback
+            return match.group(0)
+        
+        # Fix servings field specifically
+        json_text = re.sub(r'"servings":\s*([0-9-]+)', fix_servings_range, json_text)
+        
+        # Fix other common issues
+        json_text = re.sub(r',(\s*[}\]])', r'\1', json_text)  # Remove trailing commas
+        json_text = re.sub(r'(["\'])\s*\n\s*(["\'])', r'\1, \2', json_text)  # Fix line breaks
+        
+        return json_text
+
+    def generate_ai_image(self, recipe_name: str) -> str:
+        """Generate AI image using Pollinations API"""
+        import urllib.parse
+        prompt = f"professional food photography of {recipe_name}, appetizing, well-lit, high quality"
+        encoded_prompt = urllib.parse.quote(prompt)
+        return f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=900&height=600&nologo=true"
 
     def _build_streamlined_graph(self) -> StateGraph:
         """Build clean, streamlined LangGraph workflow"""
@@ -317,20 +357,15 @@ class RecipeAgent:
     def _get_transcript_node(self, state: RecipeState) -> RecipeState:
         """Fast transcript extraction"""
         try:
-            self.performance_tracker.step("transcript_start")
-            logger.info("🎬 Getting transcript...")
-            
             result = self.tools['get_transcript_from_url'].invoke({"youtube_url": state["youtube_url"]})
             
             state["video_id"] = result["video_id"]
             state["transcript"] = result["transcript"]
             state["current_step"] = "transcript_complete"
             
-            self.performance_tracker.step("transcript_complete")
-            
         except Exception as e:
             state["error"] = f"Transcript failed: {str(e)}"
-            logger.error(f"❌ Transcript error: {e}")
+            logger.error(f"Transcript error: {e}")
         
         return state
 
@@ -354,13 +389,13 @@ Use "undefined" for missing timing. JSON only:"""
     def _parse_recipe_node(self, state: RecipeState) -> RecipeState:
         """Streamlined recipe parsing"""
         try:
-            self.performance_tracker.step("parse_start")
-            logger.info("🍳 Parsing recipe...")
-            
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             recipe_text = loop.run_until_complete(self._llm_parse_recipe(state["transcript"]))
             loop.close()
+            
+            # FIXED: Preprocess common JSON issues before parsing
+            recipe_text = self._preprocess_json_text(recipe_text)
             
             try:
                 recipe_data = json.loads(recipe_text)
@@ -369,24 +404,26 @@ Use "undefined" for missing timing. JSON only:"""
                 if json_match:
                     clean_json = json_match.group()
                     clean_json = re.sub(r',(\s*[}\]])', r'\1', clean_json)
-                    recipe_data = json.loads(clean_json)
+                    clean_json = re.sub(r'(["\'])\s*\n\s*(["\'])', r'\1, \2', clean_json)
+                    try:
+                        recipe_data = json.loads(clean_json)
+                    except json.JSONDecodeError as e:
+                        logger.error(f"JSON cleanup failed: {e}")
+                        raise ValueError(f"Could not parse recipe JSON after cleanup: {e}")
                 else:
-                    raise ValueError("Could not parse recipe JSON")
+                    raise ValueError("Could not find JSON structure in LLM response")
             
             state["raw_recipe"] = recipe_data
             state["current_step"] = "parse_complete"
             
-            self.performance_tracker.step("parse_complete")
-            logger.info(f"✅ Parsed: {recipe_data.get('name', 'Unknown')}")
-            
         except Exception as e:
             state["error"] = f"Parse failed: {str(e)}"
-            logger.error(f"❌ Parse error: {e}")
+            logger.error(f"Parse error: {e}")
         
         return state
 
     @rate_limited_llm_call(delay_seconds=0.2)
-    async def _llm_intelligent_decisions(self, recipe: dict) -> tuple:
+    async def _llm_intelligent_decisions(self, recipe: dict, image_type: str) -> tuple:
         """LLM makes decisions and generates tool calls if needed"""
         self.performance_tracker.llm_call()
         
@@ -395,59 +432,61 @@ Use "undefined" for missing timing. JSON only:"""
         prep_missing = not recipe.get('prep_time') or recipe.get('prep_time') == 'undefined'
         cook_missing = not recipe.get('cook_time') or recipe.get('cook_time') == 'undefined'
         needs_timing = prep_missing or cook_missing
-        needs_image = True  # Always search for image
+        # MODIFIED: Only need image search if using stock images
+        needs_image_search = image_type == "stock"
         
-        if needs_timing or needs_image:
+        if needs_timing or needs_image_search:
             # Create tool calls for the LLM to generate
+            tool_instructions = []
+            
+            if needs_timing:
+                tool_instructions.append(f'1. For timing: query="{recipe_name} prep time cook time", search_type="text", max_results=3')
+            
+            if needs_image_search:
+                tool_instructions.append(f'2. For image: query="unsplash {recipe_name} food recipe", search_type="image", max_results=2')
+            
             prompt = f"""You need to search for missing recipe data. Generate appropriate tool calls.
 
 Recipe: {recipe_name}
 Missing timing: {needs_timing}
-Needs image: {needs_image}
+Image type: {image_type} {"(will search)" if needs_image_search else "(will use AI generation)"}
 
 Call efficient_tavily_search_tool for:
-1. If timing missing: query="{recipe_name} prep time cook time", search_type="text", max_results=3
-2. For image: query="unsplash {recipe_name} food recipe", search_type="image", max_results=2
+{chr(10).join(tool_instructions)}
 
 Generate the tool calls now."""
 
             response = self.llm.invoke([HumanMessage(content=prompt)])
-            return response, {"needs_timing": needs_timing, "needs_image": needs_image, "recipe_name": recipe_name}
+            return response, {"needs_timing": needs_timing, "needs_image_search": needs_image_search, "recipe_name": recipe_name, "image_type": image_type}
         else:
             # No tools needed
-            return None, {"needs_timing": False, "needs_image": False, "recipe_name": recipe_name}
+            return None, {"needs_timing": False, "needs_image_search": False, "recipe_name": recipe_name, "image_type": image_type}
 
     def _intelligent_enhance_node(self, state: RecipeState) -> RecipeState:
         """Generate tool calls for enhancement if needed"""
         try:
-            self.performance_tracker.step("enhance_start")
-            logger.info("🧠 Intelligent enhancement...")
-            
             raw_recipe = state["raw_recipe"]
+            if not raw_recipe:
+                state["error"] = "Cannot enhance - recipe parsing failed"
+                return state
+                
+            image_type = state.get("image_type", "stock")
             
-            # LLM decides what to search for and generates tool calls
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            llm_response, decisions = loop.run_until_complete(self._llm_intelligent_decisions(raw_recipe))
+            llm_response, decisions = loop.run_until_complete(self._llm_intelligent_decisions(raw_recipe, image_type))
             loop.close()
             
-            # Store decisions for later use
             state["search_decisions"] = decisions
             
             if llm_response and hasattr(llm_response, 'tool_calls') and llm_response.tool_calls:
-                # Add the LLM response with tool calls to messages
                 state["messages"] = state.get("messages", []) + [llm_response]
-                logger.info(f"🔧 Generated {len(llm_response.tool_calls)} tool calls")
-            else:
-                # No tools needed, proceed directly
-                logger.info("✅ No enhancement needed")
             
             state["current_step"] = "enhance_complete"
-            self.performance_tracker.step("enhance_complete")
             
         except Exception as e:
             state["error"] = f"Enhancement failed: {str(e)}"
-            logger.error(f"❌ Enhancement error: {e}")
+            logger.error(f"Enhancement error: {e}")
         
         return state
 
@@ -482,57 +521,68 @@ Generate the tool calls now."""
     def _apply_single_result(self, result: dict, recipe: dict, current_image_url: str) -> tuple:
         """Apply a single search result to the recipe"""
         if result.get('type') == 'text' and result.get('found'):
-            # Timing data
             if result.get('prep_time') and (not recipe.get('prep_time') or recipe.get('prep_time') == 'undefined'):
                 recipe['prep_time'] = result['prep_time']
-                logger.info(f"✅ Updated prep_time: {result['prep_time']}")
             
             if result.get('cook_time') and (not recipe.get('cook_time') or recipe.get('cook_time') == 'undefined'):
                 recipe['cook_time'] = result['cook_time']
-                logger.info(f"✅ Updated cook_time: {result['cook_time']}")
         
         elif result.get('type') == 'image':
-            # Image data
             if result.get('url') and not current_image_url:
                 current_image_url = result['url']
-                logger.info(f"✅ Found image: {result['url']}")
         
         return recipe, current_image_url
 
     def _format_output_node(self, state: RecipeState) -> RecipeState:
         """Smart output formatting that handles both search and no-search scenarios"""
         try:
-            self.performance_tracker.step("format_start")
-            logger.info("🎨 Formatting output...")
-            
             raw_recipe = state["raw_recipe"]
+            if not raw_recipe:
+                state["error"] = "Cannot format - no recipe data available"
+                return state
+                
             enhanced_recipe = raw_recipe.copy()
             image_url = None
+            image_type = state.get("image_type", "stock")
             
-            # Check if we have search results to apply
             messages = state.get("messages", [])
             if messages:
                 enhanced_recipe, image_url = self._apply_search_results(messages, raw_recipe)
             
-            # Set fallback image if none found
             if not image_url:
-                fallback_images = [
-                    "https://images.unsplash.com/photo-1556909114-6bca3ebce58b?w=900&auto=format&fit=crop&q=60",
-                    "https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=900&auto=format&fit=crop&q=60",
-                    "https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=900&auto=format&fit=crop&q=60"
-                ]
-                image_url = random.choice(fallback_images)
-                logger.info("🖼️ Using fallback image")
+                if image_type == "ai":
+                    recipe_name = enhanced_recipe.get('name', 'recipe')
+                    image_url = self.generate_ai_image(recipe_name)
+                else:
+                    fallback_images = [
+                        "https://images.unsplash.com/photo-1556909114-6bca3ebce58b?w=900&auto=format&fit=crop&q=60",
+                        "https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=900&auto=format&fit=crop&q=60",
+                        "https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=900&auto=format&fit=crop&q=60"
+                    ]
+                    image_url = random.choice(fallback_images)
             
-            # Fast validation with Pydantic
             try:
                 recipe = Recipe(**enhanced_recipe)
                 validated_recipe = recipe.model_dump()
             except Exception as e:
-                logger.warning(f"Validation warning: {e}")
-                validated_recipe = enhanced_recipe
+                validated_recipe = enhanced_recipe.copy()
+                
+                defaults = {
+                    "name": "Extracted Recipe",
+                    "description": "Recipe extracted from video",
+                    "category": "Main Course",
+                    "prep_time": "15 min",
+                    "cook_time": "30 min", 
+                    "servings": 4,
+                    "difficulty": "Medium",
+                    "ingredients": ["Ingredients not fully extracted"],
+                    "instructions": ["Instructions not fully extracted"]
+                }
+                
+                for key, default_value in defaults.items():
+                    if key not in validated_recipe or not validated_recipe[key]:
+                        validated_recipe[key] = default_value
             
-            # Create final formatted output
             final_recipe = {
                 "id": self._id_counter,
                 "name": validated_recipe["name"],
@@ -555,32 +605,28 @@ Generate the tool calls now."""
             
             self._id_counter += 1
             
-            self.performance_tracker.step("format_complete")
-            logger.info(f"🎉 Complete: {final_recipe['name']}")
-            
         except Exception as e:
             state["error"] = f"Format failed: {str(e)}"
-            logger.error(f"❌ Format error: {e}")
+            logger.error(f"Format error: {e}")
         
         return state
 
     def _handle_error_node(self, state: RecipeState) -> RecipeState:
         """Streamlined error handling"""
         error_msg = state.get('error', 'Unknown error')
-        logger.error(f"🚨 Pipeline failed: {error_msg}")
+        logger.error(f"Pipeline failed: {error_msg}")
         state["performance"] = self.performance_tracker.summary()
         return state
 
-    async def extract_recipe_from_youtube(self, youtube_url: str) -> Optional[Dict]:
-        """Main extraction method - optimized for 8-12 second target"""
+    async def extract_recipe_from_youtube(self, youtube_url: str, image_type: str = "stock") -> Optional[Dict]:
+        """Main extraction method with AI image generation support"""
         try:
-            # Start performance tracking
             self.performance_tracker.start()
-            logger.info(f"🚀 Starting streamlined extraction: {youtube_url}")
             
             initial_state = {
                 "messages": [],
                 "youtube_url": youtube_url,
+                "image_type": image_type,
                 "video_id": None,
                 "transcript": None,
                 "raw_recipe": None,
@@ -597,27 +643,16 @@ Generate the tool calls now."""
             final_state = await self.app.ainvoke(initial_state, config=config)
             
             if final_state.get("error"):
-                logger.error(f"❌ Pipeline failed: {final_state['error']}")
                 raise ValueError(final_state["error"])
             
             if final_state.get("final_recipe"):
                 recipe = final_state["final_recipe"]
-                perf = final_state.get("performance", {})
-                decisions = final_state.get("search_decisions", {})
-                
-                logger.info(f"🎉 Streamlined extraction complete:")
-                logger.info(f"   📝 {recipe['name']}")
-                logger.info(f"   ⏱️ {recipe.get('prep_time')} | {recipe.get('cook_time')}")
-                logger.info(f"   🔍 Timing searched: {decisions.get('needs_timing', False)}")
-                logger.info(f"   🖼️ Image searched: {decisions.get('needs_image', False)}")
-                logger.info(f"   📊 Total time: {perf.get('total_time', 0):.2f}s")
-                
                 return recipe
             else:
                 raise ValueError("No recipe extracted")
             
         except Exception as e:
-            logger.error(f"💥 Extraction failed: {e}")
+            logger.error(f"Extraction failed: {e}")
             self.performance_tracker.summary()
             raise e
 
