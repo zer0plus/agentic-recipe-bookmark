@@ -137,11 +137,6 @@
       letter-spacing: 0.05em;
     }
     
-    /* Notes section transitions */
-    .notes-transition {
-      transition: opacity 0.3s ease;
-    }
-    
     /* Focus styles for accessibility */
     .focus-ring:focus-visible {
       outline: 2px solid #FF7D55;
@@ -180,6 +175,52 @@
     
     .filter-scroll::-webkit-scrollbar {
       display: none;
+    }
+
+    /* Chat message bubbles */
+    .chat-message {
+      max-width: 80%;
+      padding: 8px 12px;
+      border-radius: 16px;
+      font-size: 14px;
+      line-height: 1.4;
+      word-wrap: break-word;
+    }
+    
+    .chat-message.user {
+      background-color: #FF7D55;
+      color: white;
+      margin-left: auto;
+      border-bottom-right-radius: 4px;
+    }
+    
+    .chat-message.assistant {
+      background-color: #F3F4F6;
+      color: #374151;
+      margin-right: auto;
+      border-bottom-left-radius: 4px;
+    }
+    
+    .chat-message.loading {
+      background-color: #F3F4F6;
+      color: #6B7280;
+      margin-right: auto;
+      border-bottom-left-radius: 4px;
+    }
+
+    /* Chat scroll styling */
+    #chat-messages::-webkit-scrollbar {
+      width: 4px;
+    }
+    
+    #chat-messages::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 2px;
+    }
+    
+    #chat-messages::-webkit-scrollbar-thumb {
+      background: #FF7D55;
+      border-radius: 2px;
     }
   </style>
 </head>
@@ -315,7 +356,7 @@
           </p>
         </div>
 
-          <!-- NEW: Image Type Selection -->
+          <!-- Image Type Selection -->
         <div class="mb-6">
           <label class="block text-sm font-medium text-gray-700 mb-3">
             Recipe Image Type
@@ -587,12 +628,12 @@
             ]
           }
         ],
-        notes: {},
         savedRecipes: [],
         currentRecipe: null,
         activeFilter: 'all',
         searchTerm: '',
-        isLoading: false
+        isLoading: false,
+        chatMessages: [] // NEW: Store chat messages for current recipe
       },
       
       // DOM Elements cache
@@ -627,15 +668,10 @@
       
       loadStoredData() {
         try {
-          const storedNotes = localStorage.getItem('recipe_notes');
           const storedSaved = localStorage.getItem('saved_recipes');
-          
-          if (storedNotes) this.state.notes = JSON.parse(storedNotes);
           if (storedSaved) this.state.savedRecipes = JSON.parse(storedSaved);
         } catch (e) {
           console.error('Error loading from localStorage:', e);
-          // Fallback to empty data
-          this.state.notes = {};
           this.state.savedRecipes = [];
         }
       },
@@ -859,7 +895,7 @@
         // Clear the input
         this.elements.youtubeUrlInput.value = '';
         
-        // NEW: Reset image type selection
+        // Reset image type selection
         this.selectedImageType = null;
         const aiToggle = document.getElementById('ai-image-toggle');
         const stockToggle = document.getElementById('stock-image-toggle');
@@ -1129,7 +1165,6 @@
         card.setAttribute('aria-label', recipe.name);
         card.setAttribute('tabindex', '0');
         
-        // RESTORED THE "View Recipe" BUTTON as requested
         card.innerHTML = `
           <div class="relative overflow-hidden">
             <img 
@@ -1254,6 +1289,9 @@
       showRecipeDetails(recipe) {
         // Set loading state
         this.state.isLoading = true;
+        
+        // Clear chat messages when switching recipes
+        this.state.chatMessages = [];
         
         // Fade out current content
         this.elements.detailsContent.style.opacity = '0';
@@ -1412,63 +1450,37 @@
               </button>
             </div>
             
-            <!-- Personal Notes Section - Completely redesigned -->
-            <div class="bg-primary-light/20 p-6 rounded-xl" id="notes-container">
-              <!-- Notes Header - Always visible -->
-              <div class="flex items-center justify-between mb-5">
-                <h4 class="flex items-center text-xl font-display font-bold text-secondary" id="notes-heading">
-                  <i class="fas fa-edit mr-3 text-primary" aria-hidden="true"></i> 
-                  Personal Notes
-                </h4>
+            <!-- Recipe Chat Section - REPLACED Personal Notes -->
+            <div class="bg-primary-light/20 p-6 rounded-xl" id="chat-container">
+              <h4 class="flex items-center text-xl font-display font-bold text-secondary mb-4">
+                <i class="fas fa-comments mr-3 text-primary" aria-hidden="true"></i> 
+                Recipe Assistant
+              </h4>
+              
+              <!-- Chat Messages -->
+              <div id="chat-messages" class="bg-white rounded-lg p-4 h-64 overflow-y-auto mb-4 space-y-3">
+                <div class="text-gray-500 text-sm text-center">Ask me about ingredient substitutions, cooking tips, or recipe modifications!</div>
               </div>
               
-              <!-- Notes content wrapper - Contains both view and edit modes -->
-              <div id="notes-content-wrapper" role="region" aria-labelledby="notes-heading">
-                <!-- Notes View Mode -->
-                <div id="notes-view-mode" class="${this.state.notes[recipe.id] ? 'block' : 'hidden'}">
-                  <div class="bg-white p-4 rounded-lg shadow-inner mb-4 min-h-24">
-                    <p id="notes-text" class="whitespace-pre-wrap text-tertiary">${this.state.notes[recipe.id] || ''}</p>
-                  </div>
-                  <button 
-                    id="edit-notes-btn" 
-                    class="bg-secondary text-white font-medium py-2 px-5 rounded-lg transition-all duration-300 hover:bg-primary transform hover:-translate-y-1 flex items-center focus-ring"
-                    aria-label="Edit personal notes"
-                  >
-                    <i class="fas fa-pencil-alt mr-2" aria-hidden="true"></i> Edit Notes
-                  </button>
-                </div>
-                
-                <!-- Notes Edit Mode -->
-                <div id="notes-edit-mode" class="${this.state.notes[recipe.id] ? 'hidden' : 'block'}">
-                  <label for="notes-textarea" class="sr-only">Personal notes for ${recipe.name}</label>
-                  <textarea 
-                    id="notes-textarea" 
-                    class="w-full min-h-32 border border-primary-light rounded-lg p-4 text-tertiary resize-y font-body bg-white focus:outline-none focus:ring-2 focus:ring-primary mb-4 shadow-inner focus-ring"
-                    placeholder="Add your personal notes, tips, or variations here..."
-                    aria-label="Personal notes for ${recipe.name}"
-                  >${this.state.notes[recipe.id] || ''}</textarea>
-                  <div class="flex justify-between items-center">
-                    <div class="flex space-x-3">
-                      <button 
-                        id="save-notes-btn" 
-                        class="bg-gradient-to-r from-primary to-primary-dark text-white font-medium py-2 px-5 rounded-lg transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 flex items-center disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none focus-ring"
-                        aria-label="Save notes"
-                      >
-                        <i class="fas fa-save mr-2" aria-hidden="true"></i> Save Notes
-                      </button>
-                      
-                      <button 
-                        id="cancel-edit-btn" 
-                        class="bg-white border border-gray-300 text-tertiary font-medium py-2 px-5 rounded-lg transition-all duration-300 hover:bg-gray-100 flex items-center focus-ring ${this.state.notes[recipe.id] ? 'block' : 'hidden'}"
-                        aria-label="Cancel editing"
-                      >
-                        <i class="fas fa-times mr-2" aria-hidden="true"></i> Cancel
-                      </button>
-                    </div>
-                    <span id="save-message" class="text-sm text-green-600" aria-live="polite"></span>
-                  </div>
-                </div>
+              <!-- Chat Input -->
+              <div class="flex space-x-2">
+                <input 
+                  id="chat-input"
+                  type="text"
+                  placeholder="e.g., Can I substitute butter with oil?"
+                  maxlength="100"
+                  class="flex-1 border border-primary-light rounded-lg p-3 focus:ring-2 focus:ring-primary focus:outline-none focus-ring"
+                  aria-label="Ask recipe question"
+                >
+                <button 
+                  id="send-chat" 
+                  class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-ring"
+                  aria-label="Send message"
+                >
+                  <i class="fas fa-paper-plane" aria-hidden="true"></i>
+                </button>
               </div>
+              <p class="text-xs text-gray-500 mt-1">Max 100 characters per question</p>
             </div>
           </div>
         `;
@@ -1491,8 +1503,8 @@
           this.setupCollapsibleSection(toggle);
         });
 
-        // Set up notes functionality
-        this.setupNotesSection(recipe);
+        // Set up chat functionality
+        this.setupChatSection(recipe);
         
         // Keyboard accessibility for collapsible sections
         document.querySelectorAll('.recipe-toggle').forEach(toggle => {
@@ -1523,148 +1535,137 @@
         });
       },
       
-      setupNotesSection(recipe) {
-        const notesViewMode = document.getElementById('notes-view-mode');
-        const notesEditMode = document.getElementById('notes-edit-mode');
-        const editNotesBtn = document.getElementById('edit-notes-btn');
-        const saveNotesBtn = document.getElementById('save-notes-btn');
-        const cancelEditBtn = document.getElementById('cancel-edit-btn');
-        const notesText = document.getElementById('notes-text');
-        const notesTextarea = document.getElementById('notes-textarea');
-        const saveMessage = document.getElementById('save-message');
+      // ====== CHAT FUNCTIONALITY ======
+      setupChatSection(recipe) {
+        const chatInput = document.getElementById('chat-input');
+        const sendButton = document.getElementById('send-chat');
+        const chatMessages = document.getElementById('chat-messages');
         
-        // Initial state setup for Save Notes button
-        this.updateSaveButtonState(notesTextarea, saveNotesBtn);
-        
-        // Listen for textarea changes
-        notesTextarea.addEventListener('input', () => {
-          this.updateSaveButtonState(notesTextarea, saveNotesBtn);
+        // Send button click handler
+        sendButton.addEventListener('click', () => {
+          this.sendChatMessage(recipe, chatInput, chatMessages, sendButton);
         });
-
-        // Switch to edit mode
-        if (editNotesBtn) {
-          editNotesBtn.addEventListener('click', () => {
-            this.switchToNotesEditMode(recipe.id, notesTextarea, notesViewMode, notesEditMode);
-          });
-        }
         
-        // Cancel edit - switch back to view mode
-        if (cancelEditBtn) {
-          cancelEditBtn.addEventListener('click', () => {
-            this.cancelNotesEdit(recipe.id, notesTextarea, notesViewMode, notesEditMode, cancelEditBtn);
-          });
-        }
-        
-        // Save notes
-        if (saveNotesBtn) {
-          saveNotesBtn.addEventListener('click', () => {
-            this.saveNotes(recipe.id, notesTextarea, notesText, notesViewMode, notesEditMode, cancelEditBtn, saveMessage);
-          });
-        }
-        
-        // Keyboard support for notes textarea
-        notesTextarea.addEventListener('keydown', (e) => {
-          // Ctrl+Enter to save
-          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        // Enter key support
+        chatInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
-            saveNotesBtn.click();
-          }
-          
-          // Escape to cancel
-          if (e.key === 'Escape' && this.state.notes[recipe.id]) {
-            e.preventDefault();
-            cancelEditBtn.click();
+            this.sendChatMessage(recipe, chatInput, chatMessages, sendButton);
           }
         });
-      },
-      
-      // ====== NOTES HANDLING ======
-      updateSaveButtonState(textarea, saveButton) {
-        const hasContent = textarea.value.trim() !== '';
-        saveButton.disabled = !hasContent;
         
-        if (hasContent) {
-          textarea.classList.add('border-primary');
-        } else {
-          textarea.classList.remove('border-primary');
-        }
-      },
-      
-      switchToNotesEditMode(recipeId, textarea, viewMode, editMode) {
-        // Update textarea with current notes
-        textarea.value = this.state.notes[recipeId] || '';
-        
-        // Switch display
-        viewMode.classList.add('hidden');
-        editMode.classList.remove('hidden');
-        
-        // Focus textarea and set cursor at end
-        textarea.focus();
-        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
-      },
-      
-      cancelNotesEdit(recipeId, textarea, viewMode, editMode, cancelBtn) {
-        if (this.state.notes[recipeId]) {
-          // Switch back to view mode
-          editMode.classList.add('hidden');
-          viewMode.classList.remove('hidden');
-        } else {
-          // If no notes, clear textarea
-          textarea.value = '';
-          this.updateSaveButtonState(textarea, document.getElementById('save-notes-btn'));
-        }
-      },
-      
-      saveNotes(recipeId, textarea, notesText, viewMode, editMode, cancelBtn, saveMessage) {
-        const newNotes = textarea.value.trim();
-        
-        // Update notes state
-        if (newNotes === '') {
-          delete this.state.notes[recipeId];
-        } else {
-          this.state.notes[recipeId] = newNotes;
-        }
-        
-        // Save to localStorage
-        try {
-          localStorage.setItem('recipe_notes', JSON.stringify(this.state.notes));
+        // Update send button state based on input
+        chatInput.addEventListener('input', () => {
+          const hasText = chatInput.value.trim().length > 0;
+          sendButton.disabled = !hasText;
           
-          // Show success message with animation
-          saveMessage.textContent = 'Notes saved!';
-          saveMessage.setAttribute('role', 'status');
-          
-          // Clear message after a delay
-          setTimeout(() => {
-            saveMessage.textContent = '';
-            saveMessage.removeAttribute('role');
-          }, 2000);
-          
-        } catch (e) {
-          console.error('Unable to save notes to localStorage:', e);
-          saveMessage.textContent = 'Unable to save notes';
-          saveMessage.className = 'text-sm text-red-600';
+          // Character count feedback
+          const remaining = 100 - chatInput.value.length;
+          if (remaining < 20) {
+            chatInput.classList.add('border-red-300');
+            chatInput.classList.remove('border-primary-light');
+          } else {
+            chatInput.classList.remove('border-red-300');
+            chatInput.classList.add('border-primary-light');
+          }
+        });
+        
+        // Initial button state
+        sendButton.disabled = true;
+      },
+      
+      async sendChatMessage(recipe, chatInput, chatMessages, sendButton) {
+        const question = chatInput.value.trim();
+        
+        if (!question || question.length === 0) return;
+        if (question.length > 100) {
+          this.showNotification('Question must be 100 characters or less', 'error');
           return;
         }
         
-        // Update UI based on whether we have notes or not
-        if (this.state.notes[recipeId]) {
-          // Update view mode text
-          notesText.textContent = this.state.notes[recipeId];
+        // Add user message
+        this.addChatMessage(chatMessages, question, 'user');
+        
+        // Clear input and disable send button
+        chatInput.value = '';
+        sendButton.disabled = true;
+        chatInput.classList.remove('border-red-300');
+        chatInput.classList.add('border-primary-light');
+        
+        // Add loading message
+        const loadingId = this.addChatMessage(chatMessages, 'Thinking...', 'loading');
+        
+        try {
+          // Call the chat API
+          const response = await fetch('/api/recipe-chat', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              recipe_name: recipe.name,
+              ingredients: recipe.ingredients,
+              question: question,
+              chat_history: this.state.chatMessages
+            })
+          });
           
-          // Show view mode, hide edit mode
-          viewMode.classList.remove('hidden');
-          editMode.classList.add('hidden');
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
           
-          // Update cancel button state for next time
-          cancelBtn.classList.remove('hidden');
-        } else {
-          // If deleted all notes, stay in edit mode but clear textarea
-          textarea.value = '';
-          textarea.focus();
+          const result = await response.json();
           
-          // Hide cancel button since there are no saved notes
-          cancelBtn.classList.add('hidden');
+          // Remove loading message
+          this.removeChatMessage(chatMessages, loadingId);
+          
+          // Add assistant response
+          this.addChatMessage(chatMessages, result.answer, 'assistant');
+          
+        } catch (error) {
+          console.error('Chat error:', error);
+          
+          // Remove loading message
+          this.removeChatMessage(chatMessages, loadingId);
+          
+          // Add error message
+          this.addChatMessage(chatMessages, 'Sorry, I had trouble answering that. Please try again.', 'assistant');
         }
+        
+        // Focus back on input
+        chatInput.focus();
+      },
+      
+      addChatMessage(chatMessages, text, type) {
+        const messageId = `msg-${Date.now()}-${Math.random()}`;
+        const messageDiv = document.createElement('div');
+        messageDiv.id = messageId;
+        messageDiv.className = 'flex ' + (type === 'user' ? 'justify-end' : 'justify-start');
+        
+        const messageBubble = document.createElement('div');
+        messageBubble.className = `chat-message ${type}`;
+        messageBubble.textContent = text;
+        
+        messageDiv.appendChild(messageBubble);
+        chatMessages.appendChild(messageDiv);
+        
+        // Scroll to bottom
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        
+        // Store in session state
+        this.state.chatMessages.push({ text, type, id: messageId });
+        
+        return messageId;
+      },
+      
+      removeChatMessage(chatMessages, messageId) {
+        const messageElement = document.getElementById(messageId);
+        if (messageElement) {
+          messageElement.remove();
+        }
+        
+        // Remove from session state
+        this.state.chatMessages = this.state.chatMessages.filter(msg => msg.id !== messageId);
       },
       
       // ====== BOOKMARK HANDLING IN DETAILS VIEW ======

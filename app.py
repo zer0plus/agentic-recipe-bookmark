@@ -1,12 +1,14 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, HttpUrl, Field
 from agent import RecipeAgent
 import uvicorn
 import logging
 import asyncio
 from typing import Optional, Literal
+from langchain_groq import ChatGroq
+from langchain.schema import HumanMessage
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -14,12 +16,13 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="Recipe Extractor", 
     description="Extract recipes from YouTube videos using intelligent LLM agents",
-    version="2.1.0"  # Updated version for image gen feature
+    version="0.0.1"
 )
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 _recipe_agent: Optional[RecipeAgent] = None
+_chat_llm: Optional[ChatGroq] = None
 
 def get_agent() -> RecipeAgent:
     """Get or create the global recipe agent instance"""
@@ -30,9 +33,20 @@ def get_agent() -> RecipeAgent:
         logger.info("✅ Recipe Agent initialized successfully")
     return _recipe_agent
 
+def get_chat_llm() -> ChatGroq:
+    """Get or create the chat LLM instance"""
+    global _chat_llm
+    if _chat_llm is None:
+        _chat_llm = ChatGroq(
+            model="llama3-8b-8192",
+            temperature=0.3,
+            max_tokens=300
+        )
+    return _chat_llm
+
 class YouTubeRequest(BaseModel):
     youtube_url: HttpUrl
-    image_type: Literal["ai", "stock"]  # NEW: Image type selection
+    image_type: Literal["ai", "stock"]
 
 class RecipeResponse(BaseModel):
     id: int
@@ -47,6 +61,15 @@ class RecipeResponse(BaseModel):
     ingredients: list[str]
     instructions: list[str]
 
+class ChatRequest(BaseModel):
+    recipe_name: str
+    ingredients: list[str]
+    question: str = Field(max_length=100)
+    chat_history: list[dict] = []
+
+class ChatResponse(BaseModel):
+    answer: str
+
 @app.get("/")
 async def root():
     return FileResponse('static/index.html')
@@ -59,7 +82,6 @@ async def extract_recipe(request: YouTubeRequest):
         
         agent = get_agent()
         
-        # Pass both URL and image type to agent
         recipe_data = await agent.extract_recipe_from_youtube(
             str(request.youtube_url), 
             image_type=request.image_type
@@ -92,47 +114,30 @@ async def extract_recipe(request: YouTubeRequest):
             detail="Internal server error during recipe extraction"
         )
 
-@app.get("/health")
-async def health_check():
-    """Health check endpoint"""
-    try:
-        agent = get_agent()
-        return {
-            "status": "healthy",
-            "agent_initialized": True,
-            "tools_count": len(agent.tools),
-            "llm_model": "llama3-8b-8192",
-            "features": ["ai_image_generation", "stock_images"]  # NEW: Feature list
-        }
-    except Exception as e:
-        logger.error(f"Health check failed: {e}")
-        return {
-            "status": "unhealthy",
-            "error": str(e)
-        }
+@app.post("/api/recipe-chat", response_model=ChatResponse)
+async def recipe_chat(request: ChatRequest):
+    chat_llm = get_chat_llm()
+    ingredients_text = ", ".join(request.ingredients)
+    
+    history_context = ""
+    if request.chat_history:
+        recent_history = request.chat_history[-20:]
+        for msg in recent_history:
+            history_context += f"{msg['type']}: {msg['text']}\n"
+    
+    prompt = f"""You are a helpful cooking assistant for "{request.recipe_name}".
 
-@app.get("/api/agent-info")
-async def agent_info():
-    """Get information about the current agent configuration"""
-    try:
-        agent = get_agent()
-        return {
-            "architecture": "tool-calling-llm",
-            "model": "llama3-8b-8192",
-            "tools": [tool.name for tool in agent.tools],
-            "capabilities": [
-                "dynamic_tool_orchestration",
-                "intelligent_workflow_routing", 
-                "error_recovery",
-                "langsmith_monitoring",
-                "ai_image_generation"  # NEW: Added capability
-            ],
-            "workflow_type": "agentic",
-            "description": "Intelligent agent with AI image generation and stock photo capabilities"
-        }
-    except Exception as e:
-        logger.error(f"Error getting agent info: {e}")
-        raise HTTPException(status_code=500, detail="Could not retrieve agent information")
+Ingredients: {ingredients_text}
+
+Previous conversation:
+{history_context}
+
+Current question: {request.question}
+
+Give 1-2 short, specific sentences."""
+
+    response = chat_llm.invoke([HumanMessage(content=prompt)])
+    return ChatResponse(answer=response.content.strip())
 
 if __name__ == "__main__":
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
